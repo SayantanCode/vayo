@@ -116,3 +116,12 @@ doing their job:
   `docs/03-data-model.md` in the same commit — they must never drift apart.
 - Describe *why*, not just *what*, in the PR description — especially for
   anything that touches `docs/05-security.md`'s non-negotiables.
+- If the change affects consumers of any published package (a bug fix, a new
+  feature, a behavior change — not internal refactors or test-only changes),
+  run `pnpm changeset` and answer its prompts; commit the generated
+  `.changeset/*.md` file alongside your code change. All 9 packages version
+  together (fixed versioning — see `.changeset/config.json`), so you won't be
+  asked to pick per-package bump levels individually. CI maintains a running
+  "Version Packages" PR from whatever changesets have accumulated on `main`;
+  `npm publish` itself stays a separate, manual `pnpm release` run locally,
+  never automatic.

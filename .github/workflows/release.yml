@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Maintains a "Version Packages" PR whenever unreleased changesets
+      # exist on main — bumping versions and writing changelogs from
+      # whatever changesets have accumulated. Deliberately has no `publish`
+      # input: npm publish stays a manual, separate, human-triggered step
+      # (CLAUDE.md) — run `pnpm release` locally once packages are actually
+      # ready to stop being `"private": true`. No NPM_TOKEN needed here.
+      - name: Create/update Version Packages PR
+        uses: changesets/action@v1
+        with:
+          version: pnpm version-packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
