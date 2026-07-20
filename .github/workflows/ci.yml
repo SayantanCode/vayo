@@ -43,6 +43,14 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Root `pnpm build` only runs `tsc -b` (project references) — it does
+      # NOT run @vayo/ui's own `vite build`, which is what actually produces
+      # dist-app/, the built SPA bundle @vayo/server serves at runtime.
+      # Without this, packages/server's "static UI serving" tests fail
+      # against a dist-app/ that was never built.
+      - name: Build @vayo/ui's SPA bundle (dist-app/)
+        run: pnpm --filter @vayo/ui build
+
       - name: Test
         run: pnpm test
         env:
