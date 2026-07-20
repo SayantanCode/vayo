@@ -4,6 +4,11 @@
   "private": true,
   "license": "MIT",
   "description": "MongoDB implementation of VayoDbAdapter (native driver, not Mongoose) plus vayo init migrations. Implements the BYODB layer.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SayantanCode/vayo.git",
+    "directory": "packages/db-mongo"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": ["dist"],

@@ -4,6 +4,11 @@
   "private": true,
   "license": "MIT",
   "description": "Compiles resolved endpoints into a valid OpenAPI 3.1 document with x-vayo-* extensions. Validates via @apidevtools/swagger-parser before ever returning a document.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SayantanCode/vayo.git",
+    "directory": "packages/openapi-compiler"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": ["dist"],

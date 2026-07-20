@@ -43,6 +43,13 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Enforces CLAUDE.md's non-negotiable #5 (schema-engine,
+      # openapi-compiler, db-mongo, and ui must never import Express/any
+      # web-framework types) — a cheap grep-based guard, not a full ESLint
+      # rule yet (see CONTRIBUTING.md), but real and checked on every PR.
+      - name: Check package boundaries
+        run: pnpm check:boundaries
+
       # Root `pnpm build` only runs `tsc -b` (project references) — it does
       # NOT run @vayo/ui's own `vite build`, which is what actually produces
       # dist-app/, the built SPA bundle @vayo/server serves at runtime.

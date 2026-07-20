@@ -4,6 +4,11 @@
   "private": true,
   "license": "MIT",
   "description": "Express middleware: captures real traffic, redacts sensitive fields, hands samples to @vayo/schema-engine. The only Vayo package allowed to import Express types.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SayantanCode/vayo.git",
+    "directory": "packages/capture-express"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": ["dist"],

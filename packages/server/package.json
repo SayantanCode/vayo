@@ -4,6 +4,11 @@
   "private": true,
   "license": "MIT",
   "description": "REST API + Socket.IO gateway + static UI hosting. Every mutating route is role-checked server-side (docs/05-security.md).",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SayantanCode/vayo.git",
+    "directory": "packages/server"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": ["dist"],

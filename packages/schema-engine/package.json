@@ -4,6 +4,11 @@
   "private": true,
   "license": "MIT",
   "description": "Framework-agnostic schema inference/merge (genson-js) and the pure override-resolution function. No Express, no MongoDB.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SayantanCode/vayo.git",
+    "directory": "packages/schema-engine"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": ["dist"],
