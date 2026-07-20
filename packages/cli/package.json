@@ -4,6 +4,11 @@
   "private": true,
   "license": "MIT",
   "description": "npx vayo init / scan / export",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SayantanCode/vayo.git",
+    "directory": "packages/cli"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": { "vayo": "dist/index.js" },

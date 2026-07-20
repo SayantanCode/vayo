@@ -4,6 +4,11 @@
   "private": true,
   "license": "MIT",
   "description": "Shared TypeScript interfaces for Vayo. No runtime code, no dependencies on any other Vayo package.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SayantanCode/vayo.git",
+    "directory": "packages/types"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": ["dist"],

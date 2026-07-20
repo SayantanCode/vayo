@@ -4,6 +4,10 @@
   "version": "0.0.0",
   "description": "Self-hosted, auto-generating API documentation for MERN/Express APIs. BYODB, no hosting cost, free team collaboration.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SayantanCode/vayo.git"
+  },
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
