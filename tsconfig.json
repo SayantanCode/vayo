@@ -1,0 +1,15 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/types" },
+    { "path": "packages/capture-express" },
+    { "path": "packages/ast" },
+    { "path": "packages/schema-engine" },
+    { "path": "packages/openapi-compiler" },
+    { "path": "packages/db-mongo" },
+    { "path": "packages/server" },
+    { "path": "packages/ui" },
+    { "path": "packages/cli" },
+    { "path": "apps/demo-app" }
+  ]
+}

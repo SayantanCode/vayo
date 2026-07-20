@@ -1,0 +1,903 @@
+// @vayo/ast
+// Static analysis pass — docs/04-capture-engine.md Step 2 and §3a.
+// Framework-specific bootstrapping (getting a live `app` instance) is
+// isolated behind the adapter path passed in via VayoConfig; this module's
+// own logic doesn't otherwise assume Express beyond that one boundary
+// (and the express-list-endpoints dependency itself, per
+// docs/08-packages-and-repo-structure.md's own description of this package).
+
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import expressListEndpoints from "express-list-endpoints";
+import { Node, Project, SyntaxKind, type CallExpression, type SourceFile } from "ts-morph";
+import type { JSONSchema } from "@vayo/types";
+
+export const DEFAULT_AUTH_MIDDLEWARE_PATTERNS = [
+  "authenticate",
+  "requireAuth",
+  "isLoggedIn",
+  "verifyToken",
+  "passport.authenticate",
+];
+
+export const DEFAULT_SCOPE_CHECK_PATTERNS = [
+  "requireScope",
+  "checkPermission",
+  "authorize",
+];
+
+/** Body-validation middleware names to recognize a Zod schema argument
+ * against (docs/04-capture-engine.md Step 2 #3) — configurable the same way
+ * auth/scope patterns are, since every team names this differently. */
+export const DEFAULT_VALIDATION_MIDDLEWARE_PATTERNS = [
+  "validateBody",
+  "validate",
+  "validateRequest",
+  "zValidator",
+];
+
+export interface VayoConfig {
+  appEntryPath: string; // e.g. "./src/app.ts" — must export a bootstrapped Express app
+  authMiddlewarePatterns?: string[];
+  scopeCheckPatterns?: string[];
+  validationMiddlewarePatterns?: string[];
+  redact?: string[];
+}
+
+export interface StaticRouteResult {
+  method: string;
+  pathTemplate: string;
+  middlewareChain: string[];
+  authRequiredGuess: boolean;
+  scopes: string[];
+  group: string;
+  summary: string | null;
+  /** A Zod- or Mongoose-derived request body shape, when one could be
+   * traced statically — see `findRequestSchemaForRoute`/
+   * `findMongooseRequestSchemaForRoute` below. `null` (not an empty
+   * object) when nothing was found, so a merge never mistakes "found
+   * nothing" for "this endpoint genuinely takes no body." */
+  requestSchema: JSONSchema | null;
+  /** "declared" when `requestSchema` came from a Zod schema the code
+   * itself validates against, "inferred" when it came from a Mongoose
+   * model's schema instead (docs/03-data-model.md) — `null` exactly when
+   * `requestSchema` is. */
+  requestSchemaSource: "declared" | "inferred" | null;
+}
+
+export interface StaticScanResult {
+  routes: StaticRouteResult[];
+}
+
+const HTTP_METHOD_PROPERTY_NAMES = new Set(["get", "post", "put", "patch", "delete", "all"]);
+
+/** Unwraps `export default app`'s value out of a dynamically-`import()`ed
+ * module. Some TS-execution loaders (tsx among them) double-wrap a CJS
+ * module's default export when it's dynamically imported from a CJS
+ * caller — `mod.default` ends up being the raw `module.exports` object
+ * (itself `{ default: app }`) rather than `app` directly. An Express app is
+ * always a callable function, so unwrap one more `.default` layer at a time
+ * until we find one (or run out of layers). */
+function unwrapApp(mod: { default?: unknown; app?: unknown }): unknown {
+  let candidate: unknown = mod.default ?? mod.app;
+  while (
+    candidate !== null &&
+    typeof candidate === "object" &&
+    "default" in (candidate as Record<string, unknown>)
+  ) {
+    candidate = (candidate as Record<string, unknown>).default;
+  }
+  return candidate;
+}
+
+/** Folder/mount-path convention (docs/04-capture-engine.md Step 2 #4): a
+ * route registered from a file under `routes/orders/*.ts` -> "Orders".
+ * Falls back to the first meaningful path segment when the entry file
+ * isn't organized that way (e.g. a single flat app.ts, as in the demo app). */
+function inferGroup(pathTemplate: string, sourceFilePath: string): string {
+  const folderMatch = sourceFilePath.replace(/\\/g, "/").match(/\/routes\/([^/]+)\//i);
+  const raw =
+    folderMatch?.[1] ??
+    pathTemplate.split("/").find((s) => s.length > 0 && !s.startsWith(":") && !/^v\d+$/i.test(s) && s !== "api");
+  if (!raw) return "General";
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+/** True when `registrationPath` (a literal string found at a route
+ * registration site, e.g. `router.get("/:id", ...)`) resolves to
+ * `runtimePath` (the fully-mounted path `express-list-endpoints` reports,
+ * e.g. `/api/admin/products/:id`). Exact equality covers routes registered
+ * directly on `app` with their full path repeated (today's flat demo-app
+ * style); segment-suffix equality covers `express.Router()` composition
+ * mounted via `app.use(prefix, router)` at any nesting depth — the router's
+ * own registration only ever sees its path relative to wherever it gets
+ * mounted, but `express-list-endpoints` resolves the live app's actual
+ * router stack at runtime, so the runtime path is always the source of
+ * truth here; only the static side needs to tolerate the prefix it can't
+ * see. Segment-based (not raw substring) so `/id` can never accidentally
+ * suffix-match inside `/userid`. */
+export function pathSegmentsMatch(registrationPath: string, runtimePath: string): boolean {
+  if (registrationPath === runtimePath) return true;
+  const regSegments = registrationPath.split("/").filter((s) => s.length > 0);
+  const runtimeSegments = runtimePath.split("/").filter((s) => s.length > 0);
+  if (regSegments.length === 0 || regSegments.length > runtimeSegments.length) return false;
+  const suffix = runtimeSegments.slice(runtimeSegments.length - regSegments.length);
+  return suffix.every((segment, i) => segment === regSegments[i]);
+}
+
+function calleeName(call: CallExpression): string | null {
+  const expr = call.getExpression();
+  if (Node.isIdentifier(expr)) return expr.getText();
+  if (Node.isPropertyAccessExpression(expr)) return expr.getName();
+  return null;
+}
+
+interface RouteRegistration {
+  method: string; // uppercased, matches express-list-endpoints' endpoint.methods
+  pathTemplate: string;
+  call: CallExpression;
+}
+
+/** Finds every `app.<method>("/path", ...)` (or `router.<method>(...)`,
+ * `someRouter.<method>(...)` — any receiver, since a route can be registered
+ * on `app` directly or on any `express.Router()`) call in the source file —
+ * the literal registration sites we can pattern-match scope-check calls and
+ * JSDoc summaries against. Captures the method name too since two different
+ * methods are frequently registered at the identical literal path (e.g.
+ * `router.get("/", list)` and `router.post("/", create)` both mounted at the
+ * same prefix) — matching on path alone would silently pick the wrong one. */
+function findRouteRegistrations(sourceFile: SourceFile): RouteRegistration[] {
+  const registrations: RouteRegistration[] = [];
+  for (const call of sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const expr = call.getExpression();
+    if (!Node.isPropertyAccessExpression(expr)) continue;
+    if (!HTTP_METHOD_PROPERTY_NAMES.has(expr.getName())) continue;
+    const [first] = call.getArguments();
+    if (!first || !Node.isStringLiteral(first)) continue;
+    registrations.push({ method: expr.getName().toUpperCase(), pathTemplate: first.getLiteralValue(), call });
+  }
+  return registrations;
+}
+
+/** Joins an `express.Router()`'s own relative registration path onto the
+ * literal prefix it's mounted at (`app.use(prefix, router)`) — mirrors how
+ * Express itself resolves it, including the router-root special case
+ * (`router.get("/", ...)` mounted at `prefix` resolves to exactly `prefix`,
+ * not `prefix + "/"`). Empty `prefix` (a registration found directly on
+ * `app`, never resolved through a mount call) is a no-op, so today's flat
+ * style keeps matching by plain equality with zero special-casing. */
+export function joinMountedPath(prefix: string, relativePath: string): string {
+  if (relativePath === "/" || relativePath === "") return prefix || "/";
+  return `${prefix}${relativePath}`;
+}
+
+/** Resolves the identifier passed as the second argument of an
+ * `X.use("/prefix", identifier)` call back to the source file it was
+ * imported from — e.g. `import productsRouter from "./routes/products/
+ * products.routes.js"` — by reading the *default* import bindings actually
+ * declared in `callSiteFile`, purely syntactically (no full symbol/alias
+ * resolution). This only ever recognizes the "one exported router per
+ * file, imported and mounted by identifier" convention; anything else
+ * (named exports, re-exports, indirection through a barrel file) simply
+ * fails to resolve a prefix for that router, which is always a safe
+ * fallback — `pathSegmentsMatch` below still catches it. */
+function resolveRouterSourceFile(identifierName: string, callSiteFile: SourceFile): SourceFile | null {
+  for (const importDecl of callSiteFile.getImportDeclarations()) {
+    const defaultImport = importDecl.getDefaultImport();
+    if (defaultImport?.getText() === identifierName) {
+      return importDecl.getModuleSpecifierSourceFile() ?? null;
+    }
+  }
+  return null;
+}
+
+/** Scans every file in the project for `X.use("/prefix", router)` calls and
+ * maps each mounted router's *source file* to the literal prefix it's
+ * mounted at — the piece `express-list-endpoints` can't give us (it only
+ * reports the live app's fully-*resolved* runtime paths, not which static
+ * file each route came from). One level of mounting only (a router
+ * mounted directly on `app` or on another router) — sufficient for the
+ * "one router per domain, all mounted in one place" convention this is
+ * built around; deeper indirection just falls through to the
+ * `pathSegmentsMatch` fallback below. */
+export function buildMountPrefixMap(project: Project): Map<string, string> {
+  const prefixByFilePath = new Map<string, string>();
+  for (const sourceFile of project.getSourceFiles()) {
+    for (const call of sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+      const expr = call.getExpression();
+      if (!Node.isPropertyAccessExpression(expr) || expr.getName() !== "use") continue;
+      const [prefixArg, routerArg] = call.getArguments();
+      if (!prefixArg || !routerArg || !Node.isStringLiteral(prefixArg) || !Node.isIdentifier(routerArg)) continue;
+      const routerFile = resolveRouterSourceFile(routerArg.getText(), sourceFile);
+      if (routerFile) prefixByFilePath.set(routerFile.getFilePath(), prefixArg.getLiteralValue());
+    }
+  }
+  return prefixByFilePath;
+}
+
+/**
+ * Scope detection (docs/04-capture-engine.md §3a): looks for calls to a
+ * configurable set of scope-check function names anywhere inside a route
+ * registration call (e.g. `requireScope("admin:read")` passed as one of
+ * `app.get(path, ...middlewares, handler)`'s arguments) and extracts the
+ * literal string(s) passed to it. Never invents a scope from runtime
+ * behavior — if no matching call exists, this returns [].
+ */
+function extractScopes(call: CallExpression, scopePatterns: string[]): string[] {
+  const scopes = new Set<string>();
+  for (const nested of call.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const name = calleeName(nested);
+    if (!name || !scopePatterns.includes(name)) continue;
+    for (const arg of nested.getArguments()) {
+      if (Node.isStringLiteral(arg)) {
+        scopes.add(arg.getLiteralValue());
+      } else if (Node.isArrayLiteralExpression(arg)) {
+        for (const element of arg.getElements()) {
+          if (Node.isStringLiteral(element)) scopes.add(element.getLiteralValue());
+        }
+      }
+    }
+  }
+  return [...scopes].sort();
+}
+
+/** Extracts the middleware chain from a static route registration's own
+ * arguments (e.g. `router.post("/", requireAuth, requireRole("admin"),
+ * handler)` -> `["requireAuth", "requireRole"]`), in registration order.
+ *
+ * Needed because `express-list-endpoints` (7.x) merges endpoints that share
+ * a literal path across different HTTP methods by concatenating their
+ * `methods` arrays, but silently keeps only the *first-registered* method's
+ * own `middlewares` array for the merged entry (see its `addEndpoints`) — a
+ * public `GET "/"` registered before a protected `POST "/"` on the same
+ * path makes the protected POST inherit GET's *empty* middleware chain.
+ * Reading it statically, per registration, sidesteps that upstream bug —
+ * this is the actual mechanism the Flowmap tab and `authRequiredGuess`
+ * below depend on being correct per method, not just per path.
+ *
+ * The first argument (the path string) and the last (the handler, always
+ * anonymous in every convention this cares about) are dropped; everything
+ * between is either a plain identifier (`requireAuth`) or a middleware
+ * factory call (`requireRole("admin")`, reported by its callee name). */
+export function extractMiddlewareNames(call: CallExpression): string[] {
+  const middlewareArgs = call.getArguments().slice(1, -1);
+  const names: string[] = [];
+  for (const arg of middlewareArgs) {
+    if (Node.isIdentifier(arg)) {
+      names.push(arg.getText());
+    } else if (Node.isCallExpression(arg)) {
+      const name = calleeName(arg);
+      if (name) names.push(name);
+    }
+  }
+  return names;
+}
+
+// ---------------------------------------------------------------------
+// Zod → JSON Schema (docs/04-capture-engine.md Step 2 #3): a real Zod
+// schema, when a team already writes one, is higher-fidelity than runtime
+// inference alone — it documents fields no traffic has exercised yet, and
+// carries `.describe()` text runtime capture could never produce. Scoped
+// deliberately narrow rather than a general Zod interpreter: object/string/
+// number/boolean/array/enum base types, a handful of common modifiers, and
+// schema *composition* (`.extend()`, `.merge()`, unions, `z.date()`, ...) is
+// left unresolved on purpose — an unresolved schema just falls back to
+// runtime inference, which is always the safe default, never a hard error.
+// ---------------------------------------------------------------------
+
+interface ZodChainLink {
+  method: string;
+  args: Node[];
+}
+
+/** Walks a Zod builder chain (`z.string().email().describe("x")`) from the
+ * outermost call inward until it hits the literal `z.<type>(...)` base —
+ * returns null for anything that isn't a chain rooted at the `z` import
+ * itself (schema composition via `.extend()`/`.merge()`, a reused variable
+ * as the base, `z.union()`/`z.record()`, etc. — all intentionally
+ * unsupported rather than guessed at). */
+function unwindZodChain(expr: Node): { base: ZodChainLink; modifiers: ZodChainLink[] } | null {
+  const modifiers: ZodChainLink[] = [];
+  let current: Node = expr;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    if (!Node.isCallExpression(current)) return null;
+    const callee = current.getExpression();
+    if (!Node.isPropertyAccessExpression(callee)) return null;
+    const method = callee.getName();
+    const args = current.getArguments();
+    const receiver = callee.getExpression();
+    if (Node.isIdentifier(receiver) && receiver.getText() === "z") {
+      return { base: { method, args }, modifiers: modifiers.reverse() };
+    }
+    modifiers.push({ method, args });
+    current = receiver;
+  }
+}
+
+function zodBaseToJsonSchema(base: ZodChainLink): JSONSchema | null {
+  switch (base.method) {
+    case "object": {
+      const [shape] = base.args;
+      if (!shape || !Node.isObjectLiteralExpression(shape)) return null;
+      const properties: Record<string, JSONSchema> = {};
+      const required: string[] = [];
+      for (const prop of shape.getProperties()) {
+        if (!Node.isPropertyAssignment(prop)) continue;
+        const key = prop.getName();
+        const valueExpr = prop.getInitializer();
+        if (!valueExpr) continue;
+        const field = zodExpressionToField(valueExpr);
+        if (!field) continue;
+        properties[key] = field.schema;
+        if (!field.optional) required.push(key);
+      }
+      return { type: "object", properties, ...(required.length > 0 ? { required } : {}) };
+    }
+    case "string":
+      return { type: "string" };
+    case "number":
+      return { type: "number" };
+    case "boolean":
+      return { type: "boolean" };
+    case "array": {
+      const [itemExpr] = base.args;
+      const itemSchema = itemExpr ? zodExpressionToField(itemExpr)?.schema : undefined;
+      return itemSchema ? { type: "array", items: itemSchema } : { type: "array" };
+    }
+    case "enum": {
+      const [arr] = base.args;
+      if (arr && Node.isArrayLiteralExpression(arr)) {
+        const values: string[] = [];
+        for (const el of arr.getElements()) {
+          if (Node.isStringLiteral(el)) values.push(el.getLiteralValue());
+        }
+        if (values.length > 0) return { type: "string", enum: values };
+      }
+      return { type: "string" };
+    }
+    default:
+      return null; // z.date()/z.union()/z.record()/z.any()/... — not modeled
+  }
+}
+
+/** Applies chained modifier calls on top of a base schema — `.describe()`
+ * for the field description this whole pass exists to recover, plus a
+ * handful of the most common validators. Anything unrecognized
+ * (`.refine()`, `.transform()`, `.default()`, `.strict()`, ...) is silently
+ * skipped rather than failing the field. */
+function applyZodModifiers(schema: JSONSchema, modifiers: ZodChainLink[]): { schema: JSONSchema; optional: boolean } {
+  let optional = false;
+  const result: JSONSchema = { ...schema };
+  for (const mod of modifiers) {
+    const [arg] = mod.args;
+    switch (mod.method) {
+      case "describe":
+        if (arg && Node.isStringLiteral(arg)) result.description = arg.getLiteralValue();
+        break;
+      case "optional":
+      case "nullish":
+        optional = true;
+        break;
+      case "email":
+        result.format = "email";
+        break;
+      case "uuid":
+        result.format = "uuid";
+        break;
+      case "url":
+        result.format = "uri";
+        break;
+      case "datetime":
+        result.format = "date-time";
+        break;
+      case "int":
+        result.type = "integer";
+        break;
+      case "min":
+        if (arg && Node.isNumericLiteral(arg)) {
+          const n = Number(arg.getText());
+          if (result.type === "string") result.minLength = n;
+          else if (result.type === "number" || result.type === "integer") result.minimum = n;
+        }
+        break;
+      case "max":
+        if (arg && Node.isNumericLiteral(arg)) {
+          const n = Number(arg.getText());
+          if (result.type === "string") result.maxLength = n;
+          else if (result.type === "number" || result.type === "integer") result.maximum = n;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  return { schema: result, optional };
+}
+
+function zodExpressionToField(expr: Node): { schema: JSONSchema; optional: boolean } | null {
+  const chain = unwindZodChain(expr);
+  if (!chain) return null;
+  const base = zodBaseToJsonSchema(chain.base);
+  if (!base) return null;
+  return applyZodModifiers(base, chain.modifiers);
+}
+
+/** Resolves a bare identifier (`CreateOrderSchema`) back to whatever it was
+ * declared as (`const CreateOrderSchema = z.object({...})`), wherever that
+ * declaration lives — same file or a different one, ts-morph's own
+ * definition-lookup handles cross-file resolution, unlike the narrower
+ * hand-rolled import-following `resolveRouterSourceFile` needs elsewhere in
+ * this file for a different purpose. */
+function resolveIdentifierInitializer(identifier: Node): Node | null {
+  if (!Node.isIdentifier(identifier)) return null;
+  for (const def of identifier.getDefinitionNodes()) {
+    if (Node.isVariableDeclaration(def)) {
+      const init = def.getInitializer();
+      if (init) return init;
+    }
+  }
+  return null;
+}
+
+/** A schema reference is either the Zod expression written inline, or an
+ * identifier pointing at one declared elsewhere — tries both. */
+function resolveZodSchema(node: Node): JSONSchema | null {
+  const direct = zodExpressionToField(node)?.schema;
+  if (direct) return direct;
+  const resolved = resolveIdentifierInitializer(node);
+  return resolved ? zodExpressionToField(resolved)?.schema ?? null : null;
+}
+
+/** Finds a request-body Zod schema statically associated with a route
+ * registration, trying two conventions in order: (1) a validation-
+ * middleware call among the route's own arguments (`validateBody(Schema)`,
+ * `zValidator("json", Schema)` — the schema is whichever argument actually
+ * resolves, checked last-to-first since the schema is usually the final
+ * arg), then (2) `Schema.parse(req.body)`/`.safeParse(...)` called directly
+ * inside the handler body. Returns null — never throws, never guesses —
+ * when neither convention matches. */
+export function findRequestSchemaForRoute(call: CallExpression, validationPatterns: string[]): JSONSchema | null {
+  const middlewareArgs = call.getArguments().slice(1, -1);
+  for (const arg of middlewareArgs) {
+    if (!Node.isCallExpression(arg)) continue;
+    const name = calleeName(arg);
+    if (!name || !validationPatterns.includes(name)) continue;
+    const schemaArgs = arg.getArguments();
+    for (let i = schemaArgs.length - 1; i >= 0; i--) {
+      const candidate = schemaArgs[i];
+      const resolved = candidate ? resolveZodSchema(candidate) : null;
+      if (resolved) return resolved;
+    }
+  }
+
+  const handler = call.getArguments().at(-1);
+  if (handler && (Node.isArrowFunction(handler) || Node.isFunctionExpression(handler))) {
+    for (const inner of handler.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+      const expr = inner.getExpression();
+      if (!Node.isPropertyAccessExpression(expr)) continue;
+      if (expr.getName() !== "parse" && expr.getName() !== "safeParse") continue;
+      const resolved = resolveZodSchema(expr.getExpression());
+      if (resolved) return resolved;
+    }
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------
+// Mongoose model → JSON Schema (docs/04-capture-engine.md Step 2 #3b): the
+// other real-world source of "what does this request body look like" for
+// the very common case where a project validates through nothing more
+// formal than its Mongoose model — the model *is* the closest thing to a
+// declared schema many real Express APIs ever write. Two conventions,
+// tried in order, each a single fixed pattern rather than a general
+// data-flow analysis — same "detect a convention, never guess" bar the Zod
+// path above holds itself to:
+//
+//   1. Direct passthrough — `Model.create(req.body)`, `new Model(req.body)`,
+//      `Model.findByIdAndUpdate(id, req.body)`,
+//      `Model.findOneAndUpdate(filter, req.body)`,
+//      `Model.updateOne(filter, req.body)` — the model's full schema shape
+//      wins outright, highest fidelity of the two.
+//   2. Destructure-and-cross-reference — `const { a, b } = req.body;`
+//      followed somewhere in the same handler by a call on an identifier
+//      that resolves to a Mongoose model (the extremely common "pull named
+//      fields off req.body, then build the doc from local variables"
+//      style, e.g. `new Model({ a, b, ...stampedFields })` a few lines
+//      later) — the schema is restricted to exactly the destructured
+//      names, each one's type looked up from that model's own field
+//      definitions when the name matches (falling back to a generic
+//      string for a name the model doesn't declare, e.g. a
+//      request-only/computed field).
+//
+// Both are marked `requestSchemaSource: "inferred"` (docs/03-data-model.md)
+// rather than "declared" like Zod: a Mongoose schema describes the
+// *stored document*, not necessarily the exact accepted request shape.
+// ---------------------------------------------------------------------
+
+const MONGOOSE_DIRECT_WRITE_METHODS = new Set(["create", "findByIdAndUpdate", "findOneAndUpdate", "updateOne"]);
+
+function isReqBodyExpression(node: Node): boolean {
+  return Node.isPropertyAccessExpression(node) && node.getName() === "body" && node.getExpression().getText() === "req";
+}
+
+/** `mongoose.Schema({...})` / `new mongoose.Schema({...})` / bare
+ * `Schema({...})` / `new Schema({...})` — Mongoose supports the factory
+ * call and `new` forms interchangeably, and a project may destructure
+ * `Schema` off the `mongoose` import instead of qualifying it every time;
+ * matched purely by callee name (`.Schema`/`Schema`), same syntactic-only
+ * pragmatism `unwindZodChain` already applies to recognizing `z`. */
+function schemaCallShapeArgument(node: Node): Node | null {
+  if (!Node.isCallExpression(node) && !Node.isNewExpression(node)) return null;
+  const expr = node.getExpression();
+  const name = Node.isIdentifier(expr) ? expr.getText() : Node.isPropertyAccessExpression(expr) ? expr.getName() : null;
+  if (name !== "Schema") return null;
+  const [shape] = node.getArguments();
+  return shape ?? null;
+}
+
+/** Resolves an identifier back to whatever it was declared as, wherever
+ * that declaration lives. TypeScript's own checker (even with plain JS +
+ * `allowJs`) already follows both ES `import` bindings AND CommonJS
+ * `require()` bindings all the way to the exporting declaration —
+ * `const X = require("./path")` + `module.exports = Y`, and a destructured
+ * `const { name } = require("./path")` + `exports.name = Y` / `module.
+ * exports.name = Y`, both resolve `getDefinitionNodes()` straight to the
+ * *exports* property-access itself (confirmed empirically — there's no
+ * public API for this, it falls out of the language service's ordinary
+ * "go to definition"). This only has to peel back one more layer: take
+ * that property access's parent assignment and return its right-hand
+ * side, the actual exported value. A `module.exports = { name }` shorthand
+ * object literal resolves further still, straight to `name`'s own
+ * declaration — nothing extra needed for that case. */
+function resolveIdentifierDeclarationInitializer(node: Node): Node | null {
+  if (!Node.isIdentifier(node)) return null;
+  for (const def of node.getDefinitionNodes()) {
+    if (Node.isVariableDeclaration(def)) {
+      const init = def.getInitializer();
+      if (init) return init;
+    }
+    if (Node.isPropertyAccessExpression(def)) {
+      const assignment = def.getParentIfKind(SyntaxKind.BinaryExpression);
+      if (assignment && assignment.getLeft() === def) return assignment.getRight();
+    }
+  }
+  return null;
+}
+
+/** A single Mongoose schema field's type reference — `String`, `Number`,
+ * `mongoose.Schema.Types.ObjectId`/`Schema.Types.ObjectId` (a Mongo
+ * document reference, documented as a plain string id), or an array of
+ * either (`[String]`, `[{...subdocument...}]`). Anything else (a custom
+ * class, `Schema.Types.Mixed`, a getter/setter function) falls back to an
+ * untyped field rather than guessing. */
+function mongooseTypeRefToJsonSchema(expr: Node): JSONSchema {
+  if (Node.isArrayLiteralExpression(expr)) {
+    const [item] = expr.getElements();
+    return item ? { type: "array", items: mongooseFieldValueToJsonSchema(item).schema } : { type: "array" };
+  }
+  const text = expr.getText();
+  if (/\bObjectId\b/.test(text)) return { type: "string" };
+  switch (text) {
+    case "String":
+      return { type: "string" };
+    case "Number":
+      return { type: "number" };
+    case "Boolean":
+      return { type: "boolean" };
+    case "Date":
+      return { type: "string", format: "date-time" };
+    case "Buffer":
+      return { type: "string", format: "binary" };
+    default:
+      return {};
+  }
+}
+
+/** Converts one schema-shape object literal (`{ field: String, other: {
+ * type: Number, required: true }, nested: { city: String } }`) into JSON
+ * Schema — the single recursive step both the top-level schema and any
+ * nested subdocument share. A property's value is one of: a full field
+ * definition (an object literal that itself has a `type` key), a bare
+ * type reference (identifier/array/property-access), or — when the object
+ * literal has no `type` key at all — a nested subdocument, recursed into
+ * as its own schema shape. */
+function mongooseSchemaShapeToJsonSchema(shape: Node): JSONSchema {
+  if (!Node.isObjectLiteralExpression(shape)) return { type: "object" };
+  const properties: Record<string, JSONSchema> = {};
+  const required: string[] = [];
+  for (const prop of shape.getProperties()) {
+    if (!Node.isPropertyAssignment(prop)) continue;
+    const key = prop.getName();
+    const valueExpr = prop.getInitializer();
+    if (!valueExpr) continue;
+    const field = mongooseFieldValueToJsonSchema(valueExpr);
+    properties[key] = field.schema;
+    if (field.required) required.push(key);
+  }
+  return { type: "object", properties, ...(required.length > 0 ? { required } : {}) };
+}
+
+function mongooseFieldValueToJsonSchema(valueExpr: Node): { schema: JSONSchema; required: boolean } {
+  if (Node.isObjectLiteralExpression(valueExpr)) {
+    const typeProp = valueExpr.getProperty("type");
+    if (!typeProp || !Node.isPropertyAssignment(typeProp)) {
+      // No "type" key at all -> a nested subdocument, not a field definition.
+      return { schema: mongooseSchemaShapeToJsonSchema(valueExpr), required: false };
+    }
+    const typeExpr = typeProp.getInitializer();
+    const schema = typeExpr ? mongooseTypeRefToJsonSchema(typeExpr) : {};
+
+    const enumProp = valueExpr.getProperty("enum");
+    if (enumProp && Node.isPropertyAssignment(enumProp)) {
+      const enumInit = enumProp.getInitializer();
+      if (enumInit && Node.isArrayLiteralExpression(enumInit)) {
+        const values = enumInit
+          .getElements()
+          .filter(Node.isStringLiteral)
+          .map((el) => el.getLiteralValue());
+        if (values.length > 0) schema.enum = values;
+      }
+    }
+
+    const requiredProp = valueExpr.getProperty("required");
+    let required = false;
+    if (requiredProp && Node.isPropertyAssignment(requiredProp)) {
+      const requiredInit = requiredProp.getInitializer();
+      if (requiredInit) {
+        // `required: true` or `required: [true, "message"]` (Mongoose's
+        // own "required with a custom message" shorthand) — either way,
+        // only the leading boolean literal matters here.
+        const boolNode = Node.isArrayLiteralExpression(requiredInit) ? requiredInit.getElements()[0] : requiredInit;
+        required = boolNode?.getKind() === SyntaxKind.TrueKeyword;
+      }
+    }
+    return { schema, required };
+  }
+  return { schema: mongooseTypeRefToJsonSchema(valueExpr), required: false };
+}
+
+/** Resolves a model identifier (`customerModel` in `import customerModel
+ * from "../models/customerModel.js"`) back to the Mongoose schema shape it
+ * was declared with — `const customerModel = mongoose.model("customer",
+ * customerSchema)`, then one further hop if the schema itself was
+ * assigned to its own variable first (`const customerSchema =
+ * mongoose.Schema({...})`) rather than passed inline. Returns null at any
+ * unresolved step (an unrecognized export/declaration style, a model
+ * defined via a factory function, ...) rather than guessing. */
+function resolveMongooseModelSchemaShape(modelIdentifier: Node): Node | null {
+  const modelInit = resolveIdentifierDeclarationInitializer(modelIdentifier);
+  if (!modelInit || !Node.isCallExpression(modelInit)) return null;
+  if (calleeName(modelInit) !== "model") return null;
+  const [, schemaArg] = modelInit.getArguments();
+  if (!schemaArg) return null;
+
+  const inlineShape = schemaCallShapeArgument(schemaArg);
+  if (inlineShape) return inlineShape;
+
+  const resolvedSchemaExpr = resolveIdentifierDeclarationInitializer(schemaArg);
+  return resolvedSchemaExpr ? schemaCallShapeArgument(resolvedSchemaExpr) : null;
+}
+
+/** Resolves the last argument of a route registration (the handler) to the
+ * function body this pass actually searches — following one cross-file
+ * hop when the handler is a bare identifier imported from a controller
+ * file (`import { addCustomer } from "../controllers/customerController.js"`,
+ * `router.post("/add", addCustomer)` — the dominant real-world convention,
+ * routes referencing named controller exports rather than inlining
+ * handlers), then unwrapping exactly one layer of HOC-wrapping
+ * (`expressAsyncHandler(async (req, res) => {...})`,
+ * `express-async-handler`'s own convention and others like it) to reach
+ * the actual function body. */
+function resolveHandlerFunctionBody(handlerExpr: Node): Node | null {
+  let target: Node | null = handlerExpr;
+  if (Node.isIdentifier(handlerExpr)) {
+    target = resolveIdentifierDeclarationInitializer(handlerExpr);
+  }
+  if (target && Node.isCallExpression(target)) {
+    const inner = target.getArguments().find((a) => Node.isArrowFunction(a) || Node.isFunctionExpression(a));
+    if (inner) target = inner;
+  }
+  return target && (Node.isArrowFunction(target) || Node.isFunctionExpression(target)) ? target : null;
+}
+
+/** Convention 1 — a call anywhere in the handler body passing `req.body`
+ * straight into a recognized Mongoose write method, on a receiver that
+ * resolves to an actual Mongoose model. */
+function findDirectPassthroughSchema(handlerBody: Node): JSONSchema | null {
+  for (const call of handlerBody.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const expr = call.getExpression();
+    const args = call.getArguments();
+    if (Node.isPropertyAccessExpression(expr) && MONGOOSE_DIRECT_WRITE_METHODS.has(expr.getName())) {
+      const bodyArg = expr.getName() === "create" ? args[0] : args[1];
+      if (!bodyArg || !isReqBodyExpression(bodyArg)) continue;
+      const shape = Node.isIdentifier(expr.getExpression()) ? resolveMongooseModelSchemaShape(expr.getExpression()) : null;
+      if (shape) return mongooseSchemaShapeToJsonSchema(shape);
+    }
+  }
+  for (const newExpr of handlerBody.getDescendantsOfKind(SyntaxKind.NewExpression)) {
+    const callee = newExpr.getExpression();
+    const [arg] = newExpr.getArguments();
+    if (!arg || !isReqBodyExpression(arg) || !Node.isIdentifier(callee)) continue;
+    const shape = resolveMongooseModelSchemaShape(callee);
+    if (shape) return mongooseSchemaShapeToJsonSchema(shape);
+  }
+  return null;
+}
+
+/** Convention 2 — `const { a, b } = req.body;` plus some other
+ * model-resolving identifier called anywhere in the same handler,
+ * restricting the model's full schema down to just the destructured
+ * field names. */
+function findDestructuredCrossReferencedSchema(handlerBody: Node): JSONSchema | null {
+  let destructuredNames: string[] | null = null;
+  for (const stmt of handlerBody.getDescendantsOfKind(SyntaxKind.VariableDeclaration)) {
+    const nameNode = stmt.getNameNode();
+    const init = stmt.getInitializer();
+    if (init && isReqBodyExpression(init) && Node.isObjectBindingPattern(nameNode)) {
+      destructuredNames = nameNode.getElements().map((el) => (el.getPropertyNameNode() ?? el.getNameNode()).getText());
+      break;
+    }
+  }
+  if (!destructuredNames || destructuredNames.length === 0) return null;
+
+  for (const call of handlerBody.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const expr = call.getExpression();
+    if (!Node.isPropertyAccessExpression(expr) || !Node.isIdentifier(expr.getExpression())) continue;
+    const shape = resolveMongooseModelSchemaShape(expr.getExpression());
+    if (!shape) continue;
+    const fullSchema = mongooseSchemaShapeToJsonSchema(shape);
+    const fullProperties = (fullSchema.properties as Record<string, JSONSchema> | undefined) ?? {};
+    const fullRequired = new Set((fullSchema.required as string[] | undefined) ?? []);
+    const properties: Record<string, JSONSchema> = {};
+    const required: string[] = [];
+    for (const name of destructuredNames) {
+      properties[name] = fullProperties[name] ?? { type: "string" };
+      if (fullRequired.has(name)) required.push(name);
+    }
+    return { type: "object", properties, ...(required.length > 0 ? { required } : {}) };
+  }
+  return null;
+}
+
+/** Finds a request-body schema inferred from a Mongoose model, when the
+ * Zod path above found nothing — see the two conventions documented
+ * above. Never throws, never guesses; null when neither matches. */
+export function findMongooseRequestSchemaForRoute(call: CallExpression): JSONSchema | null {
+  const handler = call.getArguments().at(-1);
+  if (!handler) return null;
+  const handlerBody = resolveHandlerFunctionBody(handler);
+  if (!handlerBody) return null;
+  return findDirectPassthroughSchema(handlerBody) ?? findDestructuredCrossReferencedSchema(handlerBody);
+}
+
+/** JSDoc/leading-comment above a route registration statement, if any —
+ * higher fidelity than nothing, never required (docs/04-capture-engine.md
+ * Step 2 #6). Absent for the demo app on purpose: the M1 done-when bar
+ * requires zero annotations in demo-app's own code. */
+function extractSummary(call: CallExpression): string | null {
+  const statement = call.getParentIfKind(SyntaxKind.ExpressionStatement) ?? call;
+  const ranges = statement.getLeadingCommentRanges();
+  if (ranges.length === 0) return null;
+  const text = ranges[ranges.length - 1]!.getText();
+  const cleaned = text
+    .replace(/^\/\*\*?|\*\/$/g, "")
+    .replace(/^\/\/\s?/, "")
+    .replace(/^\s*\*\s?/gm, "")
+    .trim();
+  return cleaned.length > 0 ? cleaned : null;
+}
+
+/**
+ * Runs the static pass against a bootstrapped instance of the user's app.
+ *
+ * `config.appEntryPath` (resolved relative to `rootDir`) must be a module
+ * loadable via dynamic `import()` that exports a already-configured Express
+ * app — either `export default app` or `export const app`. It should be the
+ * user's plain app (no Vayo middleware mounted), so express-list-endpoints
+ * reports only the user's own routes/middleware — see apps/demo-app for the
+ * create-app-vs-start-server split this implies.
+ *
+ * Async (unlike the synchronous signature sketched in
+ * docs/08-packages-and-repo-structure.md) because bootstrapping a live app
+ * instance is inherently a dynamic import — there's no way to do that
+ * synchronously in an ESM-resolution world.
+ */
+export async function scanProject(rootDir: string, config: VayoConfig): Promise<StaticScanResult> {
+  const entryAbsPath = path.resolve(rootDir, config.appEntryPath);
+  const mod = (await import(pathToFileURL(entryAbsPath).href)) as { default?: unknown; app?: unknown };
+  const app = unwrapApp(mod);
+  if (!app) {
+    throw new Error(
+      `@vayo/ast: ${config.appEntryPath} must export a bootstrapped Express app as "export default app" or "export const app"`,
+    );
+  }
+
+  const authPatterns = [...DEFAULT_AUTH_MIDDLEWARE_PATTERNS, ...(config.authMiddlewarePatterns ?? [])];
+  const scopePatterns = [...DEFAULT_SCOPE_CHECK_PATTERNS, ...(config.scopeCheckPatterns ?? [])];
+  const validationPatterns = [...DEFAULT_VALIDATION_MIDDLEWARE_PATTERNS, ...(config.validationMiddlewarePatterns ?? [])];
+
+  const endpoints = expressListEndpoints(app as never);
+
+  // Route registrations (and the scope-check/JSDoc calls inside them) live
+  // wherever the user actually wrote `app.get(...)` — often not the entry
+  // file itself, which may just import and call a `createApp()` factory
+  // (as apps/demo-app does). Resolve the entry's own module graph so every
+  // file it imports gets searched too, not just the entry file.
+  //
+  // `allowJs` is required, not optional, here — without it TypeScript's own
+  // module resolution (which `resolveSourceFileDependencies` relies on)
+  // silently refuses to follow imports into plain `.js` files, so a project
+  // written in JavaScript rather than TypeScript would only ever see its
+  // single entry file and nothing it imports. `vayo.config.js` itself (the
+  // CLI's own config format) is plain JS specifically so it doesn't need a
+  // TS loader — this has to work for a project written the same way.
+  const project = new Project({
+    skipAddingFilesFromTsConfig: true,
+    useInMemoryFileSystem: false,
+    compilerOptions: { allowJs: true },
+  });
+  project.addSourceFileAtPath(entryAbsPath);
+  project.resolveSourceFileDependencies();
+  const registrations = project.getSourceFiles().flatMap((sourceFile) => findRouteRegistrations(sourceFile));
+  const mountPrefixByFilePath = buildMountPrefixMap(project);
+
+  // Two-pass match per (method, runtime path): first the exact match once
+  // each registration's own router-mount prefix (if any) is resolved and
+  // joined on — this is what makes `express.Router()` composition resolve
+  // correctly, including a router's own root path. Falls back to the
+  // looser segment-suffix heuristic only when no registration resolves to
+  // an exact match (an unrecognized composition style, e.g. re-exported or
+  // indirectly-referenced routers `buildMountPrefixMap` couldn't trace).
+  function findRegistration(method: string, runtimePath: string): RouteRegistration | undefined {
+    const sameMethod = registrations.filter((r) => r.method === method);
+    const exact = sameMethod.find((r) => {
+      const prefix = mountPrefixByFilePath.get(r.call.getSourceFile().getFilePath()) ?? "";
+      return joinMountedPath(prefix, r.pathTemplate) === runtimePath;
+    });
+    if (exact) return exact;
+    const suffixMatches = sameMethod.filter((r) => pathSegmentsMatch(r.pathTemplate, runtimePath));
+    suffixMatches.sort((a, b) => b.pathTemplate.length - a.pathTemplate.length);
+    return suffixMatches[0];
+  }
+
+  const routes: StaticRouteResult[] = [];
+  for (const endpoint of endpoints) {
+    for (const method of endpoint.methods) {
+      const registration = findRegistration(method, endpoint.path);
+      // Static, per-method chain wins over express-list-endpoints' merged
+      // (and, across differently-protected sibling methods, wrong) one —
+      // see extractMiddlewareNames. Only falls back to the runtime-derived
+      // chain when no registration was found at all (an unrecognized
+      // composition style neither match strategy in findRegistration
+      // above could trace).
+      const middlewareChain = registration
+        ? extractMiddlewareNames(registration.call)
+        : endpoint.middlewares.filter((name) => name !== "anonymous");
+      const authRequiredGuess = middlewareChain.some((name) =>
+        authPatterns.some((pattern) => name === pattern || name.toLowerCase() === pattern.toLowerCase()),
+      );
+      const scopes = registration ? extractScopes(registration.call, scopePatterns) : [];
+      const summary = registration ? extractSummary(registration.call) : null;
+      const group = inferGroup(endpoint.path, registration?.call.getSourceFile().getFilePath() ?? entryAbsPath);
+      const zodRequestSchema = registration ? findRequestSchemaForRoute(registration.call, validationPatterns) : null;
+      const mongooseRequestSchema = registration && !zodRequestSchema ? findMongooseRequestSchemaForRoute(registration.call) : null;
+      const requestSchema = zodRequestSchema ?? mongooseRequestSchema;
+      const requestSchemaSource = zodRequestSchema ? "declared" : mongooseRequestSchema ? "inferred" : null;
+      routes.push({
+        method,
+        pathTemplate: endpoint.path,
+        middlewareChain,
+        authRequiredGuess,
+        scopes,
+        group,
+        summary,
+        requestSchema,
+        requestSchemaSource,
+      });
+    }
+  }
+
+  return { routes };
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@vayo/ast",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Static analysis pass: express-list-endpoints + ts-morph. Produces route/middleware/scope metadata to merge with runtime capture.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": { "build": "tsc -b", "test": "vitest run" },
+  "dependencies": {
+    "@vayo/types": "workspace:*",
+    "express-list-endpoints": "^7.1.0",
+    "ts-morph": "^23.0.0"
+  }
+}

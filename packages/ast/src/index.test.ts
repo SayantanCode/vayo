@@ -1,0 +1,507 @@
+import { Node, Project, SyntaxKind, type CallExpression } from "ts-morph";
+import { describe, expect, it } from "vitest";
+import {
+  buildMountPrefixMap,
+  DEFAULT_VALIDATION_MIDDLEWARE_PATTERNS,
+  extractMiddlewareNames,
+  findMongooseRequestSchemaForRoute,
+  findRequestSchemaForRoute,
+  joinMountedPath,
+  pathSegmentsMatch,
+} from "./index.js";
+
+const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete", "all"]);
+
+/** Finds the first `router.<method>(...)` call in a snippet — a minimal
+ * stand-in for @vayo/ast's own (unexported) findRouteRegistrations, just
+ * enough to hand a real CallExpression to extractMiddlewareNames. */
+function firstRouteRegistration(source: string): CallExpression {
+  const project = new Project({ useInMemoryFileSystem: true });
+  const file = project.createSourceFile("/route.ts", source);
+  const call = file.getDescendantsOfKind(SyntaxKind.CallExpression).find((c) => {
+    const expr = c.getExpression();
+    return Node.isPropertyAccessExpression(expr) && HTTP_METHODS.has(expr.getName());
+  });
+  if (!call) throw new Error("no route registration found in test fixture");
+  return call;
+}
+
+/** Same idea as `firstRouteRegistration`, but across multiple files (an
+ * imported Zod schema, not one declared inline) — returns the route
+ * registration call found in whichever file actually contains one. */
+function firstRouteRegistrationAcrossFiles(files: Record<string, string>): CallExpression {
+  const project = new Project({ useInMemoryFileSystem: true, compilerOptions: { allowJs: true } });
+  for (const [filePath, content] of Object.entries(files)) {
+    project.createSourceFile(filePath, content);
+  }
+  for (const file of project.getSourceFiles()) {
+    const call = file.getDescendantsOfKind(SyntaxKind.CallExpression).find((c) => {
+      const expr = c.getExpression();
+      return Node.isPropertyAccessExpression(expr) && HTTP_METHODS.has(expr.getName());
+    });
+    if (call) return call;
+  }
+  throw new Error("no route registration found across test fixture files");
+}
+
+describe("pathSegmentsMatch", () => {
+  it("matches identical paths (today's flat app.get(full path) style)", () => {
+    expect(pathSegmentsMatch("/api/orders", "/api/orders")).toBe(true);
+  });
+
+  it("matches a router's relative path as a suffix of the runtime path", () => {
+    expect(pathSegmentsMatch("/:id", "/api/admin/products/:id")).toBe(true);
+  });
+
+  it("matches through two levels of router nesting", () => {
+    expect(pathSegmentsMatch("/:id", "/api/v1/super-admin/admins/:id")).toBe(true);
+  });
+
+  it("does not falsely suffix-match a segment inside a longer segment", () => {
+    expect(pathSegmentsMatch("/id", "/api/users/userid")).toBe(false);
+  });
+
+  it("does not match an unrelated path", () => {
+    expect(pathSegmentsMatch("/api/orders", "/api/products")).toBe(false);
+  });
+});
+
+describe("joinMountedPath", () => {
+  it("resolves a router's own root path to exactly the mount prefix", () => {
+    expect(joinMountedPath("/api/v1/admin/products", "/")).toBe("/api/v1/admin/products");
+  });
+
+  it("appends a relative sub-path onto the prefix", () => {
+    expect(joinMountedPath("/api/v1/admin/products", "/:id")).toBe("/api/v1/admin/products/:id");
+  });
+
+  it("is a no-op with an empty prefix (registration found directly on app)", () => {
+    expect(joinMountedPath("", "/api/orders")).toBe("/api/orders");
+  });
+});
+
+describe("extractMiddlewareNames", () => {
+  it("returns an empty chain for a route with no middleware", () => {
+    const call = firstRouteRegistration(`router.get("/", (req, res) => res.json([]));`);
+    expect(extractMiddlewareNames(call)).toEqual([]);
+  });
+
+  it("extracts a plain identifier middleware, excluding the handler", () => {
+    const call = firstRouteRegistration(`router.post("/", requireAuth, (req, res) => res.status(201).send());`);
+    expect(extractMiddlewareNames(call)).toEqual(["requireAuth"]);
+  });
+
+  it("extracts a middleware factory call by its callee name, in order", () => {
+    const call = firstRouteRegistration(
+      `router.patch("/:id", requireAuth, requireRole("admin"), (req, res) => res.json({}));`,
+    );
+    expect(extractMiddlewareNames(call)).toEqual(["requireAuth", "requireRole"]);
+  });
+
+  it("gives a different chain per method sharing the same path — the actual bug this works around", () => {
+    // express-list-endpoints (7.x) merges GET/POST on the same literal path
+    // into one endpoint and silently keeps only the first-registered
+    // method's middlewares for both. Reading each registration's own call
+    // node individually keeps them correctly distinct.
+    const getCall = firstRouteRegistration(`router.get("/", (req, res) => res.json([]));`);
+    const postCall = firstRouteRegistration(`router.post("/", requireAuth, (req, res) => res.status(201).send());`);
+    expect(extractMiddlewareNames(getCall)).toEqual([]);
+    expect(extractMiddlewareNames(postCall)).toEqual(["requireAuth"]);
+  });
+});
+
+describe("allowJs dependency resolution (scanProject's own Project config)", () => {
+  it("follows imports into plain .js files, not just the entry file", () => {
+    // Reproduces the bug found live: a project written in plain JavaScript
+    // (not TypeScript — e.g. vayo.config.js itself, or any real Express app
+    // that isn't using TS) needs allowJs, or ts-morph's own module
+    // resolution silently refuses to follow .js imports at all and
+    // resolveSourceFileDependencies() only ever finds the entry file.
+    const project = new Project({
+      useInMemoryFileSystem: true,
+      skipAddingFilesFromTsConfig: true,
+      compilerOptions: { allowJs: true },
+    });
+    project.createSourceFile(
+      "/widgets.routes.js",
+      `import express from "express";
+       const router = express.Router();
+       router.get("/", (req, res) => res.json([]));
+       export default router;`,
+    );
+    const entry = project.createSourceFile(
+      "/entry.js",
+      `import express from "express";
+       import widgetsRouter from "./widgets.routes.js";
+       const app = express();
+       app.use("/api/v1/widgets", widgetsRouter);
+       export default app;`,
+    );
+    project.resolveSourceFileDependencies();
+    const paths = project.getSourceFiles().map((f) => f.getFilePath());
+    expect(paths).toContain(entry.getFilePath());
+    expect(paths).toContain("/widgets.routes.js");
+  });
+});
+
+describe("buildMountPrefixMap", () => {
+  function projectWithFiles(files: Record<string, string>): Project {
+    const project = new Project({ useInMemoryFileSystem: true, compilerOptions: { allowJs: true } });
+    for (const [filePath, content] of Object.entries(files)) {
+      project.createSourceFile(filePath, content);
+    }
+    return project;
+  }
+
+  it("maps a default-exported router's file to its mount prefix", () => {
+    const project = projectWithFiles({
+      "/routes/products.routes.ts": `
+        import express from "express";
+        const router = express.Router();
+        router.get("/", (req, res) => res.json([]));
+        export default router;
+      `,
+      "/loaders/routes.ts": `
+        import express from "express";
+        import productsRouter from "../routes/products.routes.js";
+        const app = express();
+        app.use("/api/v1/products", productsRouter);
+      `,
+    });
+    const map = buildMountPrefixMap(project);
+    expect(map.get("/routes/products.routes.ts")).toBe("/api/v1/products");
+  });
+
+  it("does not map a router file that's never mounted via a recognized app.use(prefix, identifier) call", () => {
+    const project = projectWithFiles({
+      "/routes/orphan.routes.ts": `
+        import express from "express";
+        const router = express.Router();
+        router.get("/", (req, res) => res.json([]));
+        export default router;
+      `,
+    });
+    const map = buildMountPrefixMap(project);
+    expect(map.size).toBe(0);
+  });
+});
+
+describe("findRequestSchemaForRoute", () => {
+  it("extracts an object schema from a validation-middleware call, including .describe() text", () => {
+    const call = firstRouteRegistration(`
+      const CreateOrderSchema = z.object({
+        productId: z.string().describe("The product being ordered"),
+        quantity: z.number().int().min(1),
+      });
+      router.post("/", requireAuth, validateBody(CreateOrderSchema), (req, res) => res.status(201).json({}));
+    `);
+    const schema = findRequestSchemaForRoute(call, DEFAULT_VALIDATION_MIDDLEWARE_PATTERNS);
+    expect(schema).toEqual({
+      type: "object",
+      properties: {
+        productId: { type: "string", description: "The product being ordered" },
+        quantity: { type: "integer", minimum: 1 },
+      },
+      required: ["productId", "quantity"],
+    });
+  });
+
+  it("extracts a schema from Schema.parse(req.body) called inside the handler, with no validation middleware at all", () => {
+    const call = firstRouteRegistration(`
+      const UpdateProfileSchema = z.object({
+        email: z.string().email().optional(),
+      });
+      router.patch("/me", (req, res) => {
+        const body = UpdateProfileSchema.parse(req.body);
+        res.json(body);
+      });
+    `);
+    const schema = findRequestSchemaForRoute(call, DEFAULT_VALIDATION_MIDDLEWARE_PATTERNS);
+    expect(schema).toEqual({
+      type: "object",
+      properties: {
+        email: { type: "string", format: "email" },
+      },
+      // email is .optional() — must not appear in `required`
+    });
+  });
+
+  it("resolves a schema imported from a different file, not just one declared inline", () => {
+    const call = firstRouteRegistrationAcrossFiles({
+      "/schemas/order.schema.ts": `
+        import { z } from "zod";
+        export const CreateOrderSchema = z.object({ productId: z.string() });
+      `,
+      "/routes/orders.routes.ts": `
+        import { CreateOrderSchema } from "../schemas/order.schema.js";
+        router.post("/", validateBody(CreateOrderSchema), (req, res) => res.status(201).json({}));
+      `,
+    });
+    const schema = findRequestSchemaForRoute(call, DEFAULT_VALIDATION_MIDDLEWARE_PATTERNS);
+    expect(schema).toEqual({
+      type: "object",
+      properties: { productId: { type: "string" } },
+      required: ["productId"],
+    });
+  });
+
+  it("returns an array-of-objects schema for z.array(z.object({...}))", () => {
+    const call = firstRouteRegistration(`
+      const BulkSchema = z.object({
+        items: z.array(z.object({ sku: z.string(), qty: z.number() })),
+      });
+      router.post("/bulk", validateBody(BulkSchema), (req, res) => res.status(201).json({}));
+    `);
+    const schema = findRequestSchemaForRoute(call, DEFAULT_VALIDATION_MIDDLEWARE_PATTERNS);
+    expect(schema).toEqual({
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { sku: { type: "string" }, qty: { type: "number" } },
+            required: ["sku", "qty"],
+          },
+        },
+      },
+      required: ["items"],
+    });
+  });
+
+  it("returns null (never a guess) when no recognized validation convention is present", () => {
+    const call = firstRouteRegistration(`router.get("/", (req, res) => res.json([]));`);
+    expect(findRequestSchemaForRoute(call, DEFAULT_VALIDATION_MIDDLEWARE_PATTERNS)).toBeNull();
+  });
+
+  it("returns null for schema composition it deliberately doesn't model (.extend()), rather than a wrong guess", () => {
+    const call = firstRouteRegistration(`
+      const Base = z.object({ id: z.string() });
+      const Extended = Base.extend({ name: z.string() });
+      router.post("/", validateBody(Extended), (req, res) => res.status(201).json({}));
+    `);
+    expect(findRequestSchemaForRoute(call, DEFAULT_VALIDATION_MIDDLEWARE_PATTERNS)).toBeNull();
+  });
+});
+
+describe("findMongooseRequestSchemaForRoute", () => {
+  it("extracts the model's schema from a direct req.body passthrough (Model.create), inline handler", () => {
+    const call = firstRouteRegistration(`
+      const customerSchema = mongoose.Schema({
+        fname: { type: String, required: true },
+        age: { type: Number },
+      });
+      const customerModel = mongoose.model("customer", customerSchema);
+      router.post("/", (req, res) => {
+        customerModel.create(req.body);
+      });
+    `);
+    expect(findMongooseRequestSchemaForRoute(call)).toEqual({
+      type: "object",
+      properties: { fname: { type: "string" }, age: { type: "number" } },
+      required: ["fname"],
+    });
+  });
+
+  it("resolves new Model(req.body), a Schema declared with `new`, and a required:[true, message] tuple", () => {
+    const call = firstRouteRegistration(`
+      const orderSchema = new mongoose.Schema({
+        sku: { type: String, required: [true, "sku is required"] },
+      });
+      const orderModel = mongoose.model("order", orderSchema);
+      router.post("/", (req, res) => {
+        new orderModel(req.body);
+      });
+    `);
+    expect(findMongooseRequestSchemaForRoute(call)).toEqual({
+      type: "object",
+      properties: { sku: { type: "string" } },
+      required: ["sku"],
+    });
+  });
+
+  it("recognizes findByIdAndUpdate/findOneAndUpdate/updateOne with req.body as the update argument", () => {
+    for (const [method, args] of [
+      ["findByIdAndUpdate", "req.params.id, req.body"],
+      ["findOneAndUpdate", "{ _id: req.params.id }, req.body"],
+      ["updateOne", "{ _id: req.params.id }, req.body"],
+    ] as const) {
+      const call = firstRouteRegistration(`
+        const productSchema = mongoose.Schema({ name: { type: String } });
+        const productModel = mongoose.model("product", productSchema);
+        router.put("/:id", (req, res) => {
+          productModel.${method}(${args});
+        });
+      `);
+      expect(findMongooseRequestSchemaForRoute(call)).toEqual({
+        type: "object",
+        properties: { name: { type: "string" } },
+      });
+    }
+  });
+
+  it("recurses into nested subdocuments (an object with no 'type' key) and arrays", () => {
+    const call = firstRouteRegistration(`
+      const customerSchema = mongoose.Schema({
+        personalInfo: {
+          address: {
+            city: { type: String },
+          },
+        },
+        tags: [String],
+      });
+      const customerModel = mongoose.model("customer", customerSchema);
+      router.post("/", (req, res) => {
+        customerModel.create(req.body);
+      });
+    `);
+    expect(findMongooseRequestSchemaForRoute(call)).toEqual({
+      type: "object",
+      properties: {
+        personalInfo: {
+          type: "object",
+          properties: {
+            address: { type: "object", properties: { city: { type: "string" } } },
+          },
+        },
+        tags: { type: "array", items: { type: "string" } },
+      },
+    });
+  });
+
+  it("maps enum and Schema.Types.ObjectId, and supports shorthand `field: Type` with no options object", () => {
+    const call = firstRouteRegistration(`
+      const orderSchema = mongoose.Schema({
+        status: { type: String, enum: ["pending", "paid"] },
+        customer: { type: mongoose.Schema.Types.ObjectId, ref: "Customer" },
+        note: String,
+      });
+      const orderModel = mongoose.model("order", orderSchema);
+      router.post("/", (req, res) => {
+        orderModel.create(req.body);
+      });
+    `);
+    expect(findMongooseRequestSchemaForRoute(call)).toEqual({
+      type: "object",
+      properties: {
+        status: { type: "string", enum: ["pending", "paid"] },
+        customer: { type: "string" },
+        note: { type: "string" },
+      },
+    });
+  });
+
+  it("resolves the model across files: route -> named-imported, HOC-wrapped controller export -> imported model", () => {
+    const call = firstRouteRegistrationAcrossFiles({
+      "/models/customerModel.js": `
+        import mongoose from "mongoose";
+        const customerSchema = mongoose.Schema({ fname: { type: String, required: true } });
+        const customerModel = mongoose.model("customer", customerSchema);
+        export default customerModel;
+      `,
+      "/controllers/customerController.js": `
+        import expressAsyncHandler from "express-async-handler";
+        import customerModel from "../models/customerModel.js";
+        export const addCustomer = expressAsyncHandler(async (req, res) => {
+          await customerModel.create(req.body);
+        });
+      `,
+      "/routes/customerRoutes.js": `
+        import { addCustomer } from "../controllers/customerController.js";
+        router.post("/add", authenticate, addCustomer);
+      `,
+    });
+    expect(findMongooseRequestSchemaForRoute(call)).toEqual({
+      type: "object",
+      properties: { fname: { type: "string" } },
+      required: ["fname"],
+    });
+  });
+
+  it("resolves a model imported via CommonJS require()/module.exports, not just ES import/export", () => {
+    const call = firstRouteRegistrationAcrossFiles({
+      "/models/userModel.js": `
+        const mongoose = require("mongoose");
+        const userSchema = mongoose.Schema({ name: { type: String, required: true } });
+        module.exports = mongoose.model("user", userSchema);
+      `,
+      "/routes/userRoutes.js": `
+        const User = require("../models/userModel.js");
+        router.post("/", async (req, res) => {
+          await User.create(req.body);
+        });
+      `,
+    });
+    expect(findMongooseRequestSchemaForRoute(call)).toEqual({
+      type: "object",
+      properties: { name: { type: "string" } },
+      required: ["name"],
+    });
+  });
+
+  it("resolves a handler through a destructured require() (CommonJS's answer to a named ES import)", () => {
+    const call = firstRouteRegistrationAcrossFiles({
+      "/models/userModel.js": `
+        const mongoose = require("mongoose");
+        const userSchema = mongoose.Schema({ name: { type: String, required: true } });
+        module.exports = mongoose.model("user", userSchema);
+      `,
+      "/controllers/userController.js": `
+        const User = require("../models/userModel.js");
+        exports.addUser = async (req, res) => {
+          await User.create(req.body);
+        };
+      `,
+      "/routes/userRoutes.js": `
+        const { addUser } = require("../controllers/userController.js");
+        router.post("/", authenticate, addUser);
+      `,
+    });
+    expect(findMongooseRequestSchemaForRoute(call)).toEqual({
+      type: "object",
+      properties: { name: { type: "string" } },
+      required: ["name"],
+    });
+  });
+
+  it("falls back to destructure-and-cross-reference when req.body is reshaped field-by-field before the model call, typing each destructured name from the model when it matches", () => {
+    const call = firstRouteRegistration(`
+      const customerSchema = mongoose.Schema({
+        fname: { type: String, required: true },
+        age: { type: Number },
+      });
+      const customerModel = mongoose.model("customer", customerSchema);
+      router.post("/", async (req, res) => {
+        const { fname, age, notOnTheModel } = req.body;
+        const existing = await customerModel.findOne({ fname });
+        const doc = new customerModel({ fname, age, extra: notOnTheModel });
+        await doc.save();
+      });
+    `);
+    expect(findMongooseRequestSchemaForRoute(call)).toEqual({
+      type: "object",
+      properties: {
+        fname: { type: "string" },
+        age: { type: "number" },
+        notOnTheModel: { type: "string" }, // not a real schema field -> generic string fallback
+      },
+      required: ["fname"],
+    });
+  });
+
+  it("returns null (never a guess) when the handler references no resolvable Mongoose model at all", () => {
+    const call = firstRouteRegistration(`router.get("/", (req, res) => res.json([]));`);
+    expect(findMongooseRequestSchemaForRoute(call)).toBeNull();
+  });
+
+  it("returns null when req.body is reshaped into a new object literal rather than passed directly or simply destructured", () => {
+    const call = firstRouteRegistration(`
+      const productSchema = mongoose.Schema({ name: { type: String } });
+      const productModel = mongoose.model("product", productSchema);
+      router.post("/", (req, res) => {
+        productModel.create({ ...req.body, extra: 1 });
+      });
+    `);
+    expect(findMongooseRequestSchemaForRoute(call)).toBeNull();
+  });
+});

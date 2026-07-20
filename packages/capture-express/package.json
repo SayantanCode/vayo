@@ -1,0 +1,21 @@
+{
+  "name": "@vayo/capture-express",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Express middleware: captures real traffic, redacts sensitive fields, hands samples to @vayo/schema-engine. The only Vayo package allowed to import Express types.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": { "build": "tsc -b", "test": "vitest run" },
+  "dependencies": {
+    "@vayo/types": "workspace:*",
+    "@vayo/schema-engine": "workspace:*"
+  },
+  "peerDependencies": {
+    "express": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21"
+  }
+}

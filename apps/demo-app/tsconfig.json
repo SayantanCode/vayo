@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "outDir": "dist", "rootDir": "src" },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/capture-express" },
+    { "path": "../../packages/db-mongo" },
+    { "path": "../../packages/ast" },
+    { "path": "../../packages/schema-engine" },
+    { "path": "../../packages/openapi-compiler" },
+    { "path": "../../packages/server" }
+  ]
+}

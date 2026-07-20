@@ -1,0 +1,27 @@
+{
+  "name": "vayo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Self-hosted, auto-generating API documentation for MERN/Express APIs. BYODB, no hosting cost, free team collaboration.",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "dev:demo": "pnpm --filter @vayo/demo-app dev",
+    "lint": "eslint . --ext .ts,.tsx",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "eslint": "^8.57.0",
+    "@typescript-eslint/eslint-plugin": "^7.16.0",
+    "@typescript-eslint/parser": "^7.16.0",
+    "eslint-plugin-boundaries": "^4.2.0",
+    "vitest": "^2.0.5"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}

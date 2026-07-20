@@ -1,0 +1,15 @@
+{
+  "name": "@vayo/schema-engine",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Framework-agnostic schema inference/merge (genson-js) and the pure override-resolution function. No Express, no MongoDB.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": { "build": "tsc -b", "test": "vitest run" },
+  "dependencies": {
+    "@vayo/types": "workspace:*",
+    "genson-js": "^0.0.8"
+  }
+}
