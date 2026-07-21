@@ -416,6 +416,47 @@ describe("DELETE /api/endpoints/:vayoId — manual endpoints only", () => {
     const res = await request(app).delete("/api/endpoints/no-such-vayo-id").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(403);
   });
+
+  it("allows deleting a non-manual endpoint once flagEndpointsNotInScan has marked it possibly removed", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+
+    // Promote to a non-manual source first — real capture traffic on a
+    // manual placeholder merges it, same as the db-mongo adapter's own rule.
+    const manual = await db.createManualEndpoint({
+      method: "get",
+      pathTemplate: "/api/v1/soon-to-be-removed",
+      version: "v1",
+      group: "Widgets",
+      summary: null,
+    });
+    const merged = await db.upsertEndpoint({
+      method: "GET",
+      pathTemplate: "/api/v1/soon-to-be-removed",
+      version: "v1",
+      requestHeaders: {},
+      requestParams: {},
+      requestQuery: {},
+      requestBody: null,
+      responseStatus: 200,
+      responseBody: {},
+      middlewareNames: [],
+      capturedAt: new Date().toISOString(),
+    });
+    expect(merged.source).toBe("merged");
+
+    // Still blocked before it's flagged.
+    const beforeFlag = await request(app).delete(`/api/endpoints/${merged.vayoId}`).set("Authorization", `Bearer ${token}`);
+    expect(beforeFlag.status).toBe(400);
+
+    const flaggedCount = await db.flagEndpointsNotInScan("v1", [], new Date().toISOString());
+    expect(flaggedCount).toBe(1);
+
+    const afterFlag = await request(app).delete(`/api/endpoints/${merged.vayoId}`).set("Authorization", `Bearer ${token}`);
+    expect(afterFlag.status).toBe(204);
+    expect(await db.getEndpoint(manual.vayoId)).toBeNull();
+  });
 });
 
 describe("Team Chat — flagging (only flagged messages need resolving)", () => {

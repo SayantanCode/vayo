@@ -4,6 +4,7 @@ import { scanCommand } from "./scan.js";
 const scanProject = vi.fn();
 const listApiVersions = vi.fn();
 const upsertStaticResult = vi.fn();
+const flagEndpointsNotInScan = vi.fn();
 const autoOrganizeFolders = vi.fn();
 const loadConfig = vi.fn();
 
@@ -12,6 +13,7 @@ vi.mock("@vayo/db-mongo", () => ({
   createAdapter: () => ({
     listApiVersions,
     upsertStaticResult,
+    flagEndpointsNotInScan,
     autoOrganizeFolders,
   }),
 }));
@@ -24,6 +26,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   listApiVersions.mockResolvedValue([]);
   loadConfig.mockResolvedValue({ appEntryPath: "./entry.js" });
+  upsertStaticResult.mockImplementation((route: { method: string; pathTemplate: string }, version: string) =>
+    Promise.resolve({ vayoId: `${route.method}:${route.pathTemplate}:${version}` }),
+  );
+  flagEndpointsNotInScan.mockResolvedValue(0);
   autoOrganizeFolders.mockResolvedValue({ foldersCreated: 0, endpointsPlaced: 0 });
   vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
   vi.spyOn(console, "log").mockImplementation(() => {});
@@ -75,5 +81,29 @@ describe("scanCommand", () => {
     await scanCommand({});
 
     expect(upsertStaticResult).toHaveBeenCalledWith(expect.anything(), "internal");
+  });
+
+  it("flags endpoints not re-found by the scan, once per distinct version, with the confirmed vayoIds for that version", async () => {
+    scanProject.mockResolvedValue({
+      routes: [
+        { method: "GET", pathTemplate: "/api/v1/widgets", group: "Widgets", middlewareChain: [], authRequiredGuess: false, scopes: [], summary: null },
+        { method: "GET", pathTemplate: "/api/v2/widgets", group: "Widgets", middlewareChain: [], authRequiredGuess: false, scopes: [], summary: null },
+      ],
+    });
+
+    await scanCommand({});
+
+    expect(flagEndpointsNotInScan).toHaveBeenCalledTimes(2);
+    expect(flagEndpointsNotInScan).toHaveBeenCalledWith("v1", ["GET:/api/v1/widgets:v1"], expect.any(String));
+    expect(flagEndpointsNotInScan).toHaveBeenCalledWith("v2", ["GET:/api/v2/widgets:v2"], expect.any(String));
+  });
+
+  it("passes an empty confirmed-id list for a version with routes only if none survived, without throwing", async () => {
+    scanProject.mockResolvedValue({ routes: [] });
+
+    await scanCommand({});
+
+    expect(flagEndpointsNotInScan).not.toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(0);
   });
 });

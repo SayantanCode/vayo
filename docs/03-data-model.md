@@ -57,6 +57,7 @@ interface EndpointDoc {
   lastSeenAt: string;
   createdAt: string;
   updatedAt: string;
+  possiblyRemovedSince: string | null; // set when a `vayo scan` no longer finds this route — see below
 }
 ```
 
@@ -98,6 +99,18 @@ section (DetailsTab) whenever it isn't at the top tier:
   `"observed"` the moment real traffic actually flows through it.
 - `null` exactly when `requestSchema` is (nothing traced yet, from any
   source).
+
+**`possiblyRemovedSince` flags a static/merged endpoint a `vayo scan` run no
+longer found** (`04-capture-engine.md` §3d), so a genuinely-removed route's
+doc entry doesn't sit here forever with no path to disappear. Only ever set
+for `source: "static"` or `"merged"` — a purely `"runtime"`/`"manual"`
+endpoint was never subject to static confirmation, so its absence from a
+scan means nothing. Cleared the instant either a later scan re-finds it
+(`mergeStaticResult`) or real traffic hits it again (`mergeCapturedSample`)
+— both are positive evidence it's still there. This is also the second
+condition (alongside `source: "manual"`) under which the docs UI allows
+deleting an endpoint outright: deleting one that's still confirmed would
+just have it silently reappear on the next scan/request.
 
 **Indexes:** unique on `vayoId`; compound on `{ version: 1, group: 1 }` for
 sidebar queries.

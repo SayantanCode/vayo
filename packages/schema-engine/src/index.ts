@@ -244,6 +244,10 @@ export function mergeCapturedSample(
     lastSeenAt: sample.capturedAt,
     createdAt: existing?.createdAt ?? sample.capturedAt,
     updatedAt: sample.capturedAt,
+    // Real traffic hitting this route at all is positive evidence it's
+    // still there — clears a previous "possibly removed" flag the same
+    // way mergeStaticResult's own re-confirmation does (04-capture-engine.md §3d).
+    possiblyRemovedSince: null,
   };
 }
 
@@ -335,6 +339,10 @@ export function mergeStaticResult(
     lastSeenAt: existing?.lastSeenAt ?? now,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
+    // This scan just found the route, which is exactly the positive
+    // evidence that clears a previous "possibly removed" flag
+    // (04-capture-engine.md §3d) — mirrors mergeCapturedSample's own clear.
+    possiblyRemovedSince: null,
   };
 }
 

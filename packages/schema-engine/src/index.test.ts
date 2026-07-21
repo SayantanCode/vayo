@@ -272,6 +272,13 @@ describe("requestSchemaSource — confidence tier tracking", () => {
     expect(first.requestSchema).toBeNull();
     expect(first.requestSchemaSource).toBeNull();
   });
+
+  it("clears a 'possibly removed' flag the moment real traffic hits the endpoint again", () => {
+    const flagged = mergeCapturedSample(null, sample());
+    const withFlag: EndpointDoc = { ...flagged, possiblyRemovedSince: "2026-07-10T00:00:00.000Z" };
+    const afterTraffic = mergeCapturedSample(withFlag, sample({ capturedAt: "2026-07-11T00:00:00.000Z" }));
+    expect(afterTraffic.possiblyRemovedSince).toBeNull();
+  });
 });
 
 describe("mergeStaticResult", () => {
@@ -346,6 +353,13 @@ describe("mergeStaticResult", () => {
     expect(second.middlewareChain).toEqual(["rateLimiter", "requireAuth"]);
   });
 
+  it("clears a 'possibly removed' flag the moment a later scan re-finds the route", () => {
+    const first = mergeStaticResult(null, staticRoute(), "v1");
+    const flagged: EndpointDoc = { ...first, possiblyRemovedSince: "2026-07-10T00:00:00.000Z" };
+    const rescanned = mergeStaticResult(flagged, staticRoute(), "v1");
+    expect(rescanned.possiblyRemovedSince).toBeNull();
+  });
+
   it("promotes a 'manual' placeholder to 'merged' once real runtime traffic arrives", () => {
     const manualDoc: EndpointDoc = {
       _id: "1",
@@ -370,6 +384,7 @@ describe("mergeStaticResult", () => {
       lastSeenAt: "2026-07-01T00:00:00.000Z",
       createdAt: "2026-07-01T00:00:00.000Z",
       updatedAt: "2026-07-01T00:00:00.000Z",
+      possiblyRemovedSince: null,
     };
 
     const afterCapture = mergeCapturedSample(manualDoc, sample());

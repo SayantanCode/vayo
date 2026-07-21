@@ -175,18 +175,20 @@ the control — the server would behave identically if the request arrived
 with no confirmation UI in front of it at all.
 
 `DELETE /api/endpoints/:vayoId` (editor) only ever deletes the `EndpointDoc`
-outright, and only when `source === "manual"`: a human-created placeholder
-that no capture path has touched yet. Every other source
-(`"runtime"`/`"static"`/`"merged"`) 400s — a captured endpoint reflects a
-route that still exists in the user's real API, so deleting the doc here
-would just have `upsertEndpoint`/`upsertStaticResult` recreate it on the
-very next request or scan, silently undoing the delete. This is checked
-server-side by re-reading the endpoint's own `source` field on every
-request, the same "never trust what the UI already hid" posture as every
-other role/ownership check in this document — a captured endpoint's Delete
-action isn't rendered in the UI at all, but that's the courtesy layer, not
-the enforcement. Writes an `endpoint_deleted` audit entry
-(`03-data-model.md`).
+outright when at least one of two conditions holds: `source === "manual"`
+(a human-created placeholder that no capture path has touched yet), or
+`possiblyRemovedSince` is set (the most recent `vayo scan` didn't re-find
+this route — `04-capture-engine.md` §3d). Absent either condition, the
+request 400s — a still-confirmed captured endpoint reflects a route that,
+as far as Vayo can tell, still exists in the user's real API, so deleting
+the doc here would just have `upsertEndpoint`/`upsertStaticResult` recreate
+it on the very next request or scan, silently undoing the delete. This is
+checked server-side by re-reading the endpoint's own `source` and
+`possiblyRemovedSince` fields on every request, the same "never trust what
+the UI already hid" posture as every other role/ownership check in this
+document — a still-confirmed captured endpoint's Delete action isn't
+rendered in the UI at all, but that's the courtesy layer, not the
+enforcement. Writes an `endpoint_deleted` audit entry (`03-data-model.md`).
 
 ## 5. Docs-viewer authentication
 

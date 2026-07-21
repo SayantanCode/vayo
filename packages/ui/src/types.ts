@@ -43,6 +43,11 @@ export interface OpenApiOperation {
    * schema is shown with visibly less confidence than a "declared"
    * (Zod-enforced) or "observed" (real traffic already matched it) one. */
   "x-vayo-request-schema-source"?: "declared" | "inferred" | "observed" | null;
+  /** ISO timestamp, present only when set — the most recent `vayo scan`
+   * didn't re-find this endpoint (docs/04-capture-engine.md §3d). Alongside
+   * "manual", this is the other condition under which the delete route
+   * allows removing an endpoint through the docs. */
+  "x-vayo-possibly-removed-since"?: string | null;
 }
 
 export interface OpenApiDoc {

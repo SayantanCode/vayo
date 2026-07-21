@@ -245,6 +245,45 @@ SSRF surface. It would need, at minimum: strict target-URL allowlisting
 host), response size/time caps, and audit logging of every proxied call —
 scoped and reviewed as its own piece of work, not bundled into this one.
 
+## Step 3d — Stale/phantom endpoint detection (`possiblyRemovedSince`)
+
+A documented endpoint has never had a way to disappear on its own, even
+after the route it describes is permanently removed from the user's real
+API: `EndpointDoc` fields are all additive/OR-merge (constraint #3,
+`00-README.md`), and the docs UI's delete route has only ever allowed
+removing a `source: "manual"` placeholder — deleting a captured endpoint
+would just have it reappear on the next scan or the next request, silently
+undoing the delete. That left genuinely-removed routes with no cleanup
+path at all, and a misleading error message ("remove the route in your
+backend instead") that doesn't actually make the stale entry go away.
+
+`EndpointDoc.possiblyRemovedSince` (`03-data-model.md`) closes this gap.
+After `vayo scan` finishes merging every route it found in the current
+pass, it calls `db.flagEndpointsNotInScan(version, confirmedVayoIds,
+flaggedAt)` once per version it touched. That method sets
+`possiblyRemovedSince: flaggedAt` on every endpoint in that version whose
+`source` is `"static"` or `"merged"` (the only ones ever subject to static
+confirmation in the first place — a purely `"runtime"`/`"manual"` endpoint
+was never confirmed by a scan, so its absence from one means nothing) and
+whose `vayoId` didn't appear in this scan's confirmed set — but only if it
+isn't already flagged, so a second, still-negative rescan doesn't roll the
+flagged-since date forward.
+
+The flag clears itself automatically the moment either signal reappears:
+`mergeStaticResult` clears it because being called at all means the
+current scan just found the route again; `mergeCapturedSample` clears it
+because real traffic hitting the endpoint is its own positive evidence.
+Neither merge function needs to know *why* the flag was set — only that
+finding the endpoint again is reason enough to clear it.
+
+Once flagged, the "it'll just reappear" objection to deleting a captured
+endpoint no longer holds, so the delete route (`05-security.md`) allows
+removing it — same as a manual placeholder. The compiled spec carries the
+flag as `x-vayo-possibly-removed-since` (one of `@vayo/openapi-compiler`'s
+`x-vayo-*` extension constants) so the UI can show a "this route may no
+longer exist" banner and unlock the Delete option in the sidebar without a
+second round-trip.
+
 ## Step 4 — Middleware chain capture (one half of the Flowmap tab's data)
 
 `express-list-endpoints` already returns each route's middleware functions **in

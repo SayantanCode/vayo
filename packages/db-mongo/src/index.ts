@@ -623,6 +623,7 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
         lastSeenAt: now,
         createdAt: now,
         updatedAt: now,
+        possiblyRemovedSince: null,
       };
       const result = await col.insertOne(doc);
       return { ...doc, _id: result.insertedId.toString() };
@@ -632,6 +633,26 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
       const db = await getDb();
       const result = await db.collection(COLLECTIONS.endpoints).deleteOne({ vayoId });
       return result.deletedCount > 0;
+    },
+
+    async flagEndpointsNotInScan(version: string, confirmedVayoIds: string[], flaggedAt: string): Promise<number> {
+      const db = await getDb();
+      // Only "static"/"merged" endpoints were ever subject to static
+      // confirmation in the first place (docs/04-capture-engine.md §3d) — a
+      // purely "runtime"/"manual" endpoint's absence from a scan means
+      // nothing. `possiblyRemovedSince: null` guard preserves the original
+      // flagged-since date across repeated non-detections instead of
+      // rolling it forward each scan.
+      const result = await db.collection(COLLECTIONS.endpoints).updateMany(
+        {
+          version,
+          source: { $in: ["static", "merged"] },
+          vayoId: { $nin: confirmedVayoIds },
+          possiblyRemovedSince: null,
+        },
+        { $set: { possiblyRemovedSince: flaggedAt } },
+      );
+      return result.modifiedCount;
     },
 
     async createFolder(folder: Omit<FolderDoc, "_id">): Promise<FolderDoc> {
