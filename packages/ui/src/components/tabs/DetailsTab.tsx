@@ -54,6 +54,14 @@ export function DetailsTab({
   return (
     <div className="details-layout">
       <div className="details-layout__content">
+        {op["x-vayo-possibly-removed-since"] && (
+          <div className="banner banner--warning">
+            The most recent scan of your API didn't find this route anymore (as of{" "}
+            {new Date(op["x-vayo-possibly-removed-since"]).toLocaleString()}). If it's genuinely gone, you can now
+            delete it from the sidebar — right-click it and choose Delete. If it's still there, re-run{" "}
+            <code>vayo scan</code> to clear this.
+          </div>
+        )}
         <CopyField label="RELATIVE PATH" value={endpoint.path} />
 
         <div className="field details-full-path__header">

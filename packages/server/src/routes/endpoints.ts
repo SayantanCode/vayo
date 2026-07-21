@@ -63,21 +63,23 @@ export function createEndpointsRouter({ db }: RouteDeps): Router {
     res.status(204).end();
   });
 
-  // Only a "manual" endpoint (a human-created placeholder, never backed by
-  // real capture data) may be deleted through the docs — deleting a
-  // captured one would just have it reappear on the next static scan or
-  // the next request, silently undoing the delete and confusing whoever
-  // did it. The route the real endpoint belongs to isn't something this
-  // tool controls in the first place (docs/00-README.md's BYODB/capture
-  // stance) — removing it from docs means removing the route in the
-  // backend itself, not deleting a row here.
+  // Deletable through the docs only when either (a) it's a "manual"
+  // placeholder — never backed by real capture data in the first place — or
+  // (b) `possiblyRemovedSince` is set, meaning the most recent `vayo scan`
+  // didn't re-find it (docs/04-capture-engine.md §3d): that's the positive
+  // evidence needed to know deleting it won't just have it silently
+  // reappear on the next scan or request. Absent either condition, deleting
+  // a still-confirmed captured endpoint would just undo itself — the route
+  // it documents isn't something this tool controls in the first place
+  // (docs/00-README.md's BYODB/capture stance), so removing it from docs
+  // means removing the route in the backend itself, not deleting a row here.
   router.delete("/api/endpoints/:vayoId", requireRole("editor"), async (req: VayoAuthedRequest, res) => {
     const endpoint = await db.getEndpoint(req.params.vayoId!);
     if (!endpoint) {
       res.status(404).json({ error: "not found" });
       return;
     }
-    if (endpoint.source !== "manual") {
+    if (endpoint.source !== "manual" && !endpoint.possiblyRemovedSince) {
       res.status(400).json({
         error: "can't delete an endpoint detected from your real API — remove the route in your backend instead",
       });

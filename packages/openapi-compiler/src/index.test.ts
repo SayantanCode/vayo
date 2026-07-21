@@ -7,6 +7,7 @@ import {
   X_VAYO_GROUP,
   X_VAYO_ID,
   X_VAYO_ORDER,
+  X_VAYO_POSSIBLY_REMOVED_SINCE,
   X_VAYO_REQUEST_SCHEMA_SOURCE,
   X_VAYO_SCOPES,
   compile,
@@ -38,6 +39,7 @@ function endpoint(overrides: Partial<ResolvedEndpoint> = {}): ResolvedEndpoint {
     lastSeenAt: "2026-07-01T00:00:00.000Z",
     createdAt: "2026-07-01T00:00:00.000Z",
     updatedAt: "2026-07-01T00:00:00.000Z",
+    possiblyRemovedSince: null,
     overridden: [],
     ...overrides,
   };
@@ -224,6 +226,18 @@ describe("compile", () => {
       "v1",
     );
     expect((observed.paths["/api/v1/users"] as Record<string, any>).post[X_VAYO_REQUEST_SCHEMA_SOURCE]).toBe("observed");
+  });
+
+  it("emits x-vayo-possibly-removed-since when set, so the UI can offer deletion for a non-manual endpoint", async () => {
+    const doc = await compile([endpoint({ possiblyRemovedSince: "2026-07-10T00:00:00.000Z" })], "v1");
+    const op = (doc.paths["/api/v1/users/{id}"] as Record<string, any>).get;
+    expect(op[X_VAYO_POSSIBLY_REMOVED_SINCE]).toBe("2026-07-10T00:00:00.000Z");
+  });
+
+  it("omits x-vayo-possibly-removed-since when null", async () => {
+    const doc = await compile([endpoint({ possiblyRemovedSince: null })], "v1");
+    const op = (doc.paths["/api/v1/users/{id}"] as Record<string, any>).get;
+    expect(X_VAYO_POSSIBLY_REMOVED_SINCE in op).toBe(false);
   });
 
   it("emits query parameters alongside path parameters, both in one parameters array", async () => {

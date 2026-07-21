@@ -8,6 +8,7 @@
 import { MongoClient } from "mongodb";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { CapturedSample } from "@vayo/types";
+import type { StaticRouteMergeInput } from "@vayo/schema-engine";
 import { ATTACHMENTS_BUCKET, COLLECTIONS, createAdapter, runMigrations } from "./index.js";
 
 const TEST_MONGO_URI = process.env.VAYO_TEST_MONGO_URI ?? "mongodb://localhost:27017/vayo_test_dbmongo";
@@ -514,6 +515,87 @@ describe("createAdapter — deleteEndpoint", () => {
 
   it("returns false for a vayoId that doesn't exist", async () => {
     expect(await adapter.deleteEndpoint("no-such-vayo-id")).toBe(false);
+  });
+});
+
+function staticRoute(overrides: Partial<StaticRouteMergeInput> = {}): StaticRouteMergeInput {
+  return {
+    method: "GET",
+    pathTemplate: "/api/v1/widgets",
+    middlewareChain: [],
+    authRequiredGuess: false,
+    scopes: [],
+    group: "Widgets",
+    summary: null,
+    ...overrides,
+  };
+}
+
+describe("createAdapter — flagEndpointsNotInScan", () => {
+  it("flags a static/merged endpoint not present in confirmedVayoIds, leaving present ones untouched", async () => {
+    const kept = await adapter.upsertStaticResult(staticRoute({ pathTemplate: "/api/v1/kept" }), "v1");
+    const dropped = await adapter.upsertStaticResult(staticRoute({ pathTemplate: "/api/v1/dropped" }), "v1");
+
+    const flaggedCount = await adapter.flagEndpointsNotInScan("v1", [kept.vayoId], "2026-07-10T00:00:00.000Z");
+    expect(flaggedCount).toBe(1);
+
+    expect((await adapter.getEndpoint(kept.vayoId))!.possiblyRemovedSince).toBeNull();
+    expect((await adapter.getEndpoint(dropped.vayoId))!.possiblyRemovedSince).toBe("2026-07-10T00:00:00.000Z");
+  });
+
+  it("preserves the original flagged-since date across a later scan that still doesn't find it", async () => {
+    const dropped = await adapter.upsertStaticResult(staticRoute({ pathTemplate: "/api/v1/dropped" }), "v1");
+
+    await adapter.flagEndpointsNotInScan("v1", [], "2026-07-10T00:00:00.000Z");
+    await adapter.flagEndpointsNotInScan("v1", [], "2026-07-20T00:00:00.000Z"); // a later, still-negative rescan
+
+    expect((await adapter.getEndpoint(dropped.vayoId))!.possiblyRemovedSince).toBe("2026-07-10T00:00:00.000Z");
+  });
+
+  it("never flags a purely runtime or manual endpoint — they were never subject to static confirmation", async () => {
+    const runtime = await adapter.upsertEndpoint(sample({ pathTemplate: "/api/v1/runtime-only" }));
+    const manual = await adapter.createManualEndpoint({
+      method: "get",
+      pathTemplate: "/api/v1/manual-only",
+      version: "v1",
+      group: "Widgets",
+      summary: null,
+    });
+
+    await adapter.flagEndpointsNotInScan("v1", [], "2026-07-10T00:00:00.000Z");
+
+    expect((await adapter.getEndpoint(runtime.vayoId))!.possiblyRemovedSince).toBeNull();
+    expect((await adapter.getEndpoint(manual.vayoId))!.possiblyRemovedSince).toBeNull();
+  });
+
+  it("only touches endpoints in the given version", async () => {
+    const v1 = await adapter.upsertStaticResult(staticRoute({ pathTemplate: "/api/v1/thing" }), "v1");
+    const v2 = await adapter.upsertStaticResult(staticRoute({ pathTemplate: "/api/v2/thing" }), "v2");
+
+    await adapter.flagEndpointsNotInScan("v1", [], "2026-07-10T00:00:00.000Z");
+
+    expect((await adapter.getEndpoint(v1.vayoId))!.possiblyRemovedSince).toBe("2026-07-10T00:00:00.000Z");
+    expect((await adapter.getEndpoint(v2.vayoId))!.possiblyRemovedSince).toBeNull();
+  });
+
+  it("clears the flag the moment a later scan re-finds the endpoint", async () => {
+    const route = staticRoute({ pathTemplate: "/api/v1/comeback" });
+    const first = await adapter.upsertStaticResult(route, "v1");
+    await adapter.flagEndpointsNotInScan("v1", [], "2026-07-10T00:00:00.000Z");
+    expect((await adapter.getEndpoint(first.vayoId))!.possiblyRemovedSince).not.toBeNull();
+
+    const rescanned = await adapter.upsertStaticResult(route, "v1"); // scan found it again
+    expect(rescanned.possiblyRemovedSince).toBeNull();
+  });
+
+  it("clears the flag the moment real traffic hits the endpoint again", async () => {
+    const route = staticRoute({ pathTemplate: "/api/v1/comeback-via-traffic" });
+    const first = await adapter.upsertStaticResult(route, "v1");
+    await adapter.flagEndpointsNotInScan("v1", [], "2026-07-10T00:00:00.000Z");
+    expect((await adapter.getEndpoint(first.vayoId))!.possiblyRemovedSince).not.toBeNull();
+
+    const captured = await adapter.upsertEndpoint(sample({ pathTemplate: "/api/v1/comeback-via-traffic" }));
+    expect(captured.possiblyRemovedSince).toBeNull();
   });
 });
 

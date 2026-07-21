@@ -170,7 +170,11 @@ export function FolderTree(props: FolderTreeProps): JSX.Element {
     currentParentId: string | null;
   } | null>(null);
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<{ id: string; name: string } | null>(null);
-  const [confirmDeleteEndpoint, setConfirmDeleteEndpoint] = useState<{ vayoId: string; label: string } | null>(null);
+  const [confirmDeleteEndpoint, setConfirmDeleteEndpoint] = useState<{
+    vayoId: string;
+    label: string;
+    reason: "manual" | "possibly-removed";
+  } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [dropIndicator, setDropIndicator] = useState<{ id: string; position: DropPosition } | null>(null);
   // The pointer's Y at pickup (a ref, not state — read inside the drag
@@ -360,7 +364,7 @@ export function FolderTree(props: FolderTreeProps): JSX.Element {
     vayoId: string,
     folderId: string | null,
     currentSummary: string,
-    isManual: boolean,
+    deletable: "manual" | "possibly-removed" | null,
     label: string,
   ) {
     if (!props.canEdit) return;
@@ -377,10 +381,13 @@ export function FolderTree(props: FolderTreeProps): JSX.Element {
           },
         },
         { label: "Move to…", onClick: () => setMoveTarget({ kind: "endpoint", id: vayoId, currentParentId: folderId }) },
-        // Only a manual (never-captured) endpoint gets this option at all —
-        // deleting a real one would just have it reappear on the next scan
+        // A manual (never-captured) placeholder, or one the most recent
+        // scan didn't re-find, gets this option — deleting any other
+        // captured endpoint would just have it reappear on the next scan
         // or the next request (see the delete route's own comment).
-        ...(isManual ? [{ label: "Delete", onClick: () => setConfirmDeleteEndpoint({ vayoId, label }), danger: true }] : []),
+        ...(deletable
+          ? [{ label: "Delete", onClick: () => setConfirmDeleteEndpoint({ vayoId, label, reason: deletable }), danger: true }]
+          : []),
       ],
     });
   }
@@ -518,7 +525,11 @@ export function FolderTree(props: FolderTreeProps): JSX.Element {
       {confirmDeleteEndpoint && (
         <ConfirmModal
           title={`Delete "${confirmDeleteEndpoint.label}"?`}
-          message="This is a manually-created endpoint — it isn't backed by a real route in your API, so nothing will reappear on the next scan. This can't be undone."
+          message={
+            confirmDeleteEndpoint.reason === "manual"
+              ? "This is a manually-created endpoint — it isn't backed by a real route in your API, so nothing will reappear on the next scan. This can't be undone."
+              : "The most recent scan didn't find this route in your API anymore. If it's actually still there, run \"vayo scan\" again first — this will otherwise reappear. This can't be undone."
+          }
           confirmLabel="Delete endpoint"
           onCancel={() => setConfirmDeleteEndpoint(null)}
           onConfirm={() => {
@@ -556,7 +567,7 @@ interface TreeRowProps {
     vayoId: string,
     folderId: string | null,
     currentSummary: string,
-    isManual: boolean,
+    deletable: "manual" | "possibly-removed" | null,
     label: string,
   ) => void;
 }
@@ -685,7 +696,11 @@ function TreeRow({ row, ...props }: TreeRowProps): JSX.Element {
           endpoint.vayoId,
           folderId,
           endpoint.summary ?? "",
-          endpoint.operation["x-vayo-source"] === "manual",
+          endpoint.operation["x-vayo-source"] === "manual"
+            ? "manual"
+            : endpoint.operation["x-vayo-possibly-removed-since"]
+              ? "possibly-removed"
+              : null,
           endpoint.summary || endpoint.path,
         )
       }
@@ -717,6 +732,14 @@ function TreeRow({ row, ...props }: TreeRowProps): JSX.Element {
           }
         >
           {endpoint.summary || endpoint.path}
+        </span>
+      )}
+      {endpoint.operation["x-vayo-possibly-removed-since"] && (
+        <span
+          className="tree-row__flag"
+          title="The most recent scan didn't find this route in your API anymore — it may have been removed."
+        >
+          ⚠
         </span>
       )}
       <span className={`method-badge method-badge--${endpoint.method.toLowerCase()}`}>{endpoint.method}</span>

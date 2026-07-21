@@ -82,6 +82,9 @@ export function createFakeDb(): VayoDbAdapter {
         lastSeenAt: now,
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
+        // Real traffic is positive evidence the endpoint's still there —
+        // clears any prior "possibly removed" flag, same as the real adapter.
+        possiblyRemovedSince: null,
       };
       endpoints.set(vayoId, doc);
       return doc;
@@ -338,12 +341,29 @@ export function createFakeDb(): VayoDbAdapter {
         lastSeenAt: now,
         createdAt: now,
         updatedAt: now,
+        possiblyRemovedSince: null,
       };
       endpoints.set(vayoId, doc);
       return doc;
     },
     async deleteEndpoint(vayoId) {
       return endpoints.delete(vayoId);
+    },
+    async flagEndpointsNotInScan(version, confirmedVayoIds, flaggedAt) {
+      const confirmed = new Set(confirmedVayoIds);
+      let count = 0;
+      for (const [vayoId, endpoint] of endpoints) {
+        if (
+          endpoint.version === version &&
+          (endpoint.source === "static" || endpoint.source === "merged") &&
+          !confirmed.has(vayoId) &&
+          endpoint.possiblyRemovedSince === null
+        ) {
+          endpoints.set(vayoId, { ...endpoint, possiblyRemovedSince: flaggedAt });
+          count++;
+        }
+      }
+      return count;
     },
 
     async createFolder(folder) {

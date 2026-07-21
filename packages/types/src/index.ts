@@ -99,6 +99,18 @@ export interface EndpointDoc {
   lastSeenAt: string;
   createdAt: string;
   updatedAt: string;
+  /** Set the moment a `vayo scan` run completes without re-finding this
+   * endpoint (docs/04-capture-engine.md §3d) — only ever applies to an
+   * endpoint whose `source` includes a static contribution ("static" or
+   * "merged"); a purely "runtime"/"manual" endpoint was never subject to
+   * static confirmation in the first place, so its absence from a scan
+   * means nothing. Cleared automatically the moment either a later scan
+   * re-finds it, or real traffic hits it again — both are positive
+   * evidence it's still there. Exists specifically so a genuinely-removed
+   * route's doc entry doesn't sit in `vayo_endpoints` forever with no path
+   * to disappear: once flagged, deleting it through the docs no longer
+   * risks "it'll just reappear next scan" (docs/05-security.md §4b). */
+  possiblyRemovedSince: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -659,12 +671,23 @@ export interface VayoDbAdapter {
     group: string;
     summary: string | null;
   }): Promise<EndpointDoc>;
-  /** Hard-delete. Callers must check `source === "manual"` first — deleting
-   * a real (captured) endpoint's doc would just have it reappear on the
-   * next scan or the next request, silently undoing the delete; this
-   * method itself doesn't re-check, same as `deleteFolder` trusting its own
-   * caller (docs/05-security.md — the route is where that rule lives). */
+  /** Hard-delete. Callers must check `source === "manual"` OR
+   * `possiblyRemovedSince` is set first — deleting a real (captured)
+   * endpoint that's still actively confirmed would just have it reappear
+   * on the next scan or the next request, silently undoing the delete;
+   * this method itself doesn't re-check, same as `deleteFolder` trusting
+   * its own caller (docs/05-security.md — the route is where that rule
+   * lives). */
   deleteEndpoint(vayoId: string): Promise<boolean>;
+  /** Flags every endpoint in `version` whose `source` includes a static
+   * contribution ("static"/"merged") and whose `vayoId` isn't in
+   * `confirmedVayoIds` (the full route set a `vayo scan` run just
+   * produced) with `possiblyRemovedSince: flaggedAt` — but only if it
+   * isn't already flagged, so re-running a scan that still doesn't find
+   * it keeps the *original* flagged-since date, not a rolling one.
+   * Returns how many were newly flagged, for `vayo scan` to report.
+   * Purely additive/informational — never deletes anything itself. */
+  flagEndpointsNotInScan(version: string, confirmedVayoIds: string[], flaggedAt: string): Promise<number>;
 
   // -------------------------------------------------------------------------
   // Folders (vayo_folders)

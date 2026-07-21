@@ -46,6 +46,13 @@ export const X_VAYO_SOURCE = "x-vayo-source";
 // real requestBody, same null-exactly-when-requestSchema-is rule the
 // underlying field itself follows.
 export const X_VAYO_REQUEST_SCHEMA_SOURCE = "x-vayo-request-schema-source";
+// ISO timestamp (EndpointDoc.possiblyRemovedSince verbatim), present only
+// when set — the moment a `vayo scan` run completed without re-finding this
+// endpoint (docs/04-capture-engine.md §3d). Lets the UI show "this route may
+// no longer exist in your backend" and offer deletion for a non-manual
+// endpoint, which is otherwise blocked (docs/05-security.md's
+// endpoint-deletion rule).
+export const X_VAYO_POSSIBLY_REMOVED_SINCE = "x-vayo-possibly-removed-since";
 
 export interface OpenAPIDocument {
   openapi: "3.1.0";
@@ -193,6 +200,7 @@ function buildOperation(
 
   if (endpoint.summary) operation.summary = endpoint.summary;
   if (endpoint.notes) operation[X_VAYO_NOTES] = endpoint.notes;
+  if (endpoint.possiblyRemovedSince) operation[X_VAYO_POSSIBLY_REMOVED_SINCE] = endpoint.possiblyRemovedSince;
 
   // folderId/order arrive as ad-hoc properties set by the
   // "${vayoId}.folderId"/"${vayoId}.order" overrides — not part of
