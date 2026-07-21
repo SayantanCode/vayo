@@ -163,6 +163,14 @@ module.exports = undefined; // <- replace with your bootstrapped Express app
        const db = createAdapter(process.env.VAYO_MONGO_URI);
        app.use(capture({ db }));`;
 
+  const embedSnippet = esm
+    ? `       import { createServer } from "@vayo/server";
+       const { app: vayoApp } = createServer({ db, mountPath: "/docs", httpServer: server });
+       app.use(vayoApp); // docs now live at http://localhost:<your-port>/docs`
+    : `       const { createServer } = require("@vayo/server");
+       const { app: vayoApp } = createServer({ db, mountPath: "/docs", httpServer: server });
+       app.use(vayoApp); // docs now live at http://localhost:<your-port>/docs`;
+
   console.log(`
 Next steps:
 
@@ -181,6 +189,18 @@ ${wiringSnippet}
   4. If you're using standalone auth (no authMiddleware of your own), create
      your first login with "vayo create-owner" — there's no other way in.
 
-  5. Run "vayo serve" to browse your docs.
+  5. Browse your docs. Two ways to do this — pick whichever fits your setup:
+
+     a) Standalone, on their own port — no code changes, run this whenever
+        you want the docs up:
+
+           vayo serve
+
+     b) Embedded in your own app's existing port, alongside your real API
+        (needs your app to already be listening on an http.Server you have
+        a reference to, called \`server\` below — the same one \`app.listen()\`
+        returns):
+
+${embedSnippet}
 `);
 }

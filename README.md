@@ -119,14 +119,51 @@ Vayo never sees a second set of passwords (`docs/05-security.md` §5).
 
 ### 5. Serve your docs
 
+Two ways to do this — pick whichever fits your setup. Both give you the
+same docs UI; the only difference is which port it lives on.
+
+**Standalone, on its own port** — no code changes, run this whenever you
+want the docs up:
+
 ```bash
 npx vayo serve --port 4100
 ```
 
-Browse to `http://localhost:4100/vayo`, sign in, and you'll see every
-endpoint `vayo scan` found — inferred request/response schemas, working
-example values, and a live request client, with zero annotations written
-by hand.
+Browse to `http://localhost:4100/vayo` and sign in.
+
+**Embedded in your own app, on the same port as your real API** — no
+second port to explain to your team, no "why is there another server
+running" question. Mount Vayo's Express app into yours, on the same
+`http.Server` your app already listens with:
+
+```js
+const { createServer } = require("@vayo/server");
+const { createAdapter } = require("@vayo/db-mongo");
+
+const server = app.listen(3000); // your existing app.listen() call
+const db = createAdapter(process.env.VAYO_MONGO_URI);
+const { app: vayoApp } = createServer({ db, mountPath: "/docs", httpServer: server });
+app.use(vayoApp);
+```
+
+Now the docs live at `http://localhost:3000/docs` — same port, same
+process, nothing extra to deploy or explain. `vayo init`'s printed next
+steps include this exact snippet, adjusted for your project's module
+format (ESM vs. CommonJS).
+
+Either way, sign in and you'll see every endpoint `vayo scan` found —
+inferred request/response schemas, working example values, and a live
+request client, with zero annotations written by hand.
+
+**A note on nodemon (or any watch-mode dev server):** the docs UI reads
+from `vayo_endpoints` in your database, not from your source files
+directly — restarting your app doesn't re-run `vayo scan` or replay
+traffic on its own. If you add a new route, run `vayo scan` again (or just
+hit the new route once — runtime capture updates the docs automatically,
+no restart needed for that part). Team edits (overrides, comments) show up
+live in every open docs tab over the realtime connection, but a brand-new
+endpoint from a fresh `vayo scan` needs a page reload to appear in the
+sidebar — it isn't pushed live the way an edit to an existing endpoint is.
 
 ### What you actually get, tab by tab
 
