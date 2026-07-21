@@ -306,7 +306,13 @@ export function FlowsModal({
           <div className="flows-modal__editor">
             <label className="field">
               <span>Name</span>
-              <input name="flowName" value={name} onChange={(e) => setName(e.target.value)} placeholder="Signup then fetch profile" />
+              <input
+                name="flowName"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Signup then fetch profile"
+                disabled={!canEdit}
+              />
             </label>
 
             <div className="flows-modal__steps">
@@ -322,15 +328,19 @@ export function FlowsModal({
                         {endpoint?.method ?? "?"}
                       </span>
                       <span className="flows-modal__step-path">{endpoint?.path ?? step.vayoId}</span>
-                      <button type="button" className="icon-button" onClick={() => moveStep(i, -1)}>
-                        <ChevronUp size={14} />
-                      </button>
-                      <button type="button" className="icon-button" onClick={() => moveStep(i, 1)}>
-                        <ChevronDown size={14} />
-                      </button>
-                      <button type="button" className="icon-button" onClick={() => removeStep(i)}>
-                        <Trash2 size={14} />
-                      </button>
+                      {canEdit && (
+                        <>
+                          <button type="button" className="icon-button" onClick={() => moveStep(i, -1)}>
+                            <ChevronUp size={14} />
+                          </button>
+                          <button type="button" className="icon-button" onClick={() => moveStep(i, 1)}>
+                            <ChevronDown size={14} />
+                          </button>
+                          <button type="button" className="icon-button" onClick={() => removeStep(i)}>
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
                     </div>
 
                     <div className="flows-modal__extracts">
@@ -339,6 +349,7 @@ export function FlowsModal({
                           <input
                             placeholder="variable name"
                             value={extract.key}
+                            disabled={!canEdit}
                             onChange={(e) =>
                               updateExtracts(
                                 i,
@@ -349,6 +360,7 @@ export function FlowsModal({
                           <input
                             placeholder="response.body.token"
                             value={extract.path}
+                            disabled={!canEdit}
                             onChange={(e) =>
                               updateExtracts(
                                 i,
@@ -356,22 +368,26 @@ export function FlowsModal({
                               )
                             }
                           />
-                          <button
-                            type="button"
-                            className="icon-button"
-                            onClick={() => updateExtracts(i, step.extracts.filter((_, idx) => idx !== ei))}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {canEdit && (
+                            <button
+                              type="button"
+                              className="icon-button"
+                              onClick={() => updateExtracts(i, step.extracts.filter((_, idx) => idx !== ei))}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       ))}
-                      <button
-                        type="button"
-                        className="link-button"
-                        onClick={() => updateExtracts(i, [...step.extracts, { key: "", path: "" }])}
-                      >
-                        + Extract a variable
-                      </button>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          className="link-button"
+                          onClick={() => updateExtracts(i, [...step.extracts, { key: "", path: "" }])}
+                        >
+                          + Extract a variable
+                        </button>
+                      )}
                     </div>
 
                     {stepResult && (
