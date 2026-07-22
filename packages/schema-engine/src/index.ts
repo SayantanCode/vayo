@@ -220,6 +220,11 @@ export function mergeCapturedSample(
     group: existing?.group ?? inferGroupFromPath(sample.pathTemplate),
     groupSource: existing?.groupSource ?? "inferred",
     summary: existing?.summary ?? null,
+    // Runtime capture has no deprecation signal of its own — preserve
+    // whatever the static scan (or a human override, layered on top later
+    // by resolveEndpoint) already established.
+    deprecated: existing?.deprecated ?? false,
+    deprecatedSource: existing?.deprecatedSource ?? null,
     notes: existing?.notes ?? null,
     authRequired,
     authType,
@@ -269,6 +274,11 @@ export interface StaticRouteMergeInput {
    * defaults to "inferred" when omitted. */
   groupSource?: "declared" | "inferred";
   summary: string | null;
+  /** True when `@vayo/ast` found an explicit bare `@deprecated` tag
+   * (docs/04-capture-engine.md Step 2 #4a) — optional so any caller still
+   * constructing the older shape keeps compiling; defaults to `false`
+   * when omitted. */
+  deprecated?: boolean;
   /** A Zod- or Mongoose-derived request body shape, when `@vayo/ast` could
    * trace one statically (docs/04-capture-engine.md Step 2 #3/#3b) —
    * optional so any caller still constructing the older shape (without
@@ -324,6 +334,17 @@ export function mergeStaticResult(
     // group value that's actually just a fresh guess.
     groupSource: route.groupSource ?? "inferred",
     summary: route.summary ?? existing?.summary ?? null,
+    // Unconditional, same reasoning as group/groupSource immediately
+    // above: if the current scan's route no longer carries an explicit
+    // @deprecated tag, that must clear deprecatedSource back to null too
+    // (a stale "declared" lock would otherwise block a human from ever
+    // un-deprecating it again in the UI, on a fact the code no longer
+    // asserts). A human's own override for "deprecated" — set via the UI
+    // independent of any code tag — lives in vayo_overrides and survives
+    // this unconditional base-layer overwrite regardless, applied on top
+    // by resolveEndpoint exactly like every other overridable field.
+    deprecated: route.deprecated ?? false,
+    deprecatedSource: route.deprecated ? "declared" : null,
     notes: existing?.notes ?? null,
     authRequired,
     authType: existing?.authType ?? null,

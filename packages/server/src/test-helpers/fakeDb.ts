@@ -24,7 +24,7 @@ import type {
   TestScriptDoc,
   VayoDbAdapter,
 } from "@vayo/types";
-import { stableHash } from "@vayo/schema-engine";
+import { mergeStaticResult, stableHash, type StaticRouteMergeInput } from "@vayo/schema-engine";
 import { Readable } from "node:stream";
 
 let nextId = 1;
@@ -68,6 +68,8 @@ export function createFakeDb(): VayoDbAdapter {
         group: existing?.group ?? "General",
         groupSource: existing?.groupSource ?? "inferred",
         summary: existing?.summary ?? null,
+        deprecated: existing?.deprecated ?? false,
+        deprecatedSource: existing?.deprecatedSource ?? null,
         notes: existing?.notes ?? null,
         authRequired: existing?.authRequired ?? false,
         authType: existing?.authType ?? null,
@@ -90,8 +92,19 @@ export function createFakeDb(): VayoDbAdapter {
       endpoints.set(vayoId, doc);
       return doc;
     },
-    async upsertStaticResult(): Promise<EndpointDoc> {
-      throw new Error("fakeDb: upsertStaticResult is not exercised by any @vayo/server route");
+    // No production @vayo/server route calls this directly (only vayo
+    // scan/@vayo/cli does) — but the "declared" group/deprecated lock
+    // tests need a way to seed an endpoint whose groupSource/
+    // deprecatedSource is actually "declared", so this delegates to the
+    // real mergeStaticResult, same as upsertEndpoint delegates to
+    // mergeCapturedSample just above.
+    async upsertStaticResult(route: StaticRouteMergeInput, version: string): Promise<EndpointDoc> {
+      const vayoId = stableHash(route.method, route.pathTemplate, version);
+      const existing = endpoints.get(vayoId) ?? null;
+      const doc = mergeStaticResult(existing, route, version);
+      const saved = { ...doc, _id: existing?._id ?? genId("ep") };
+      endpoints.set(vayoId, saved);
+      return saved;
     },
     async getEndpoint(vayoId) {
       return endpoints.get(vayoId) ?? null;
@@ -328,6 +341,8 @@ export function createFakeDb(): VayoDbAdapter {
         group: input.group,
         groupSource: "inferred",
         summary: input.summary,
+        deprecated: false,
+        deprecatedSource: null,
         notes: null,
         authRequired: false,
         authType: null,

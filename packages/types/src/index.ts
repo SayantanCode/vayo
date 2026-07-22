@@ -62,6 +62,23 @@ export interface EndpointDoc {
    * itself says (docs/03-data-model.md "Manual endpoints & folders"). */
   groupSource: "declared" | "inferred";
   summary: string | null;
+  /** OpenAPI's own standard `deprecated` field, not an x-vayo-* extension —
+   * true when a human has flagged this ONE endpoint deprecated, independent
+   * of the whole API *version*'s own lifecycle (`ApiVersionDoc.status`,
+   * `07-api-versioning.md`): a route can be deprecated while its version is
+   * still fully active. Set either by an explicit `@deprecated` tag in code
+   * (see `deprecatedSource`) or, when not code-declared, freely via the UI
+   * like any other override-controlled field. */
+  deprecated: boolean;
+  /** "declared" exactly when an explicit `@deprecated` tag produced
+   * `deprecated: true` (docs/04-capture-engine.md Step 2 #4a); `null`
+   * otherwise (including when a human — not the code — set `deprecated`
+   * true via override). The UI treats "declared" as authoritative: a
+   * human can still flag a NOT-code-declared endpoint as deprecated, but
+   * can't un-deprecate one the code itself marks deprecated — the same
+   * narrow, deliberate exception to "manual override always wins" that
+   * `groupSource: "declared"` already carves out for folder placement. */
+  deprecatedSource: "declared" | null;
   /** Markdown (with embedded Mermaid diagram support in the UI) explaining
    * how this endpoint fits into a larger frontend workflow — e.g. "this
    * endpoint's response.id feeds the next endpoint's categoryId param."
@@ -514,7 +531,11 @@ export interface VayoDbAdapter {
       authRequiredGuess: boolean;
       scopes: string[];
       group: string;
+      groupSource?: "declared" | "inferred";
       summary: string | null;
+      deprecated?: boolean;
+      requestSchema?: JSONSchema | null;
+      requestSchemaSource?: "declared" | "inferred" | null;
     },
     version: string,
   ): Promise<EndpointDoc>;

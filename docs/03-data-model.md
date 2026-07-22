@@ -42,6 +42,8 @@ interface EndpointDoc {
   group: string;             // display grouping, e.g. "Orders", or "Admin/Users" when nested — see below
   groupSource: "declared" | "inferred"; // how `group` was populated — see below
   summary: string | null;    // AST-derived if available (e.g. JSDoc), else null
+  deprecated: boolean;       // OpenAPI's own standard field, not x-vayo-* — see below
+  deprecatedSource: "declared" | null; // "declared" only when an @deprecated tag set deprecated — see below
   notes: string | null;      // markdown (+ Mermaid), the per-endpoint frontend-workflow notes — set via override like every other field
   authRequired: boolean;     // see 05-security.md §3 for detection algorithm
   authType: "bearer" | "apiKey" | "basic" | "cookie" | null; // "cookie" is the only auto-detected value (04-capture-engine.md §3c); the rest are override-only
@@ -113,12 +115,31 @@ first-URL-segment fallback, or a manually-created endpoint's free-text
 group field — is `"inferred"`. The UI treats `"declared"` as authoritative
 for folder *placement* specifically: such an endpoint can still be
 reordered among its current folder's own siblings via drag-and-drop, but
-the sidebar refuses to relocate it to a different folder, since that would
-silently diverge from what the code itself says. This is the one
-deliberate exception to this app's usual "manual override always wins"
-rule — every other field (summary, notes, scopes, `authType`, etc.) still
-lets a human's edit win outright over whatever the code or runtime capture
-says.
+a move to a different folder is refused — both in the sidebar and,
+server-side, in `PATCH /api/endpoints/:vayoId/placement`, since that
+would silently diverge from what the code itself says and a UI-only guard
+isn't a real guarantee. The lock only applies once a placement override
+already exists — a brand new "declared" endpoint that hasn't been placed
+anywhere yet has nothing to diverge from, so its first placement is never
+blocked. This is one of two deliberate exceptions to this app's usual
+"manual override always wins" rule (the other is `deprecatedSource`,
+below) — every other field (summary, notes, scopes, `authType`, etc.)
+still lets a human's edit win outright over whatever the code or runtime
+capture says.
+
+**`deprecated`/`deprecatedSource` — the second such exception**
+(`04-capture-engine.md` Step 2 #4a). `deprecated` is OpenAPI's own
+standard Operation Object field (not `x-vayo-*`) — independent of the
+whole API *version*'s own lifecycle (`ApiVersionDoc.status`,
+`07-api-versioning.md`): one route can be deprecated while its version is
+still fully active. `deprecatedSource` is `"declared"` only when an
+explicit bare `@deprecated` tag in code produced `deprecated: true`;
+`null` otherwise, including when a human (not the code) set `deprecated`
+true via the normal override mechanism. A human can freely flag any
+NOT-code-declared endpoint deprecated (or not) through the UI, but once
+`deprecatedSource` is `"declared"`, the UI can't un-deprecate it — checked
+server-side in `PATCH /api/endpoints/:vayoId/deprecated`, not just hidden
+in the UI.
 
 **`possiblyRemovedSince` flags a static/merged endpoint a `vayo scan` run no
 longer found** (`04-capture-engine.md` §3d), so a genuinely-removed route's

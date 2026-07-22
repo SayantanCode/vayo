@@ -612,6 +612,8 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
         // "manual" endpoint.
         groupSource: "inferred",
         summary: input.summary,
+        deprecated: false,
+        deprecatedSource: null,
         notes: null,
         authRequired: false,
         authType: null,

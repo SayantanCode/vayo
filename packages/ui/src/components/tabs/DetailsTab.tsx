@@ -40,8 +40,26 @@ export function DetailsTab({
   const params = op.parameters ?? [];
   const requestSchema = op.requestBody?.content["application/json"].schema;
   const resolvedOrigin = resolveOrigin(apiOrigin, environment?.variables ?? {});
+  const deprecatedLocked = op["x-vayo-deprecated-source"] === "declared";
 
   const [examples, setExamples] = useState<ExampleDoc[]>([]);
+  const [deprecated, setDeprecated] = useState(Boolean(op.deprecated));
+  const [deprecatedSaving, setDeprecatedSaving] = useState(false);
+
+  useEffect(() => {
+    setDeprecated(Boolean(op.deprecated));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endpoint.vayoId, op.deprecated]);
+
+  async function toggleDeprecated(next: boolean) {
+    setDeprecatedSaving(true);
+    try {
+      await api.setDeprecated(config, endpoint.vayoId, next);
+      setDeprecated(next);
+    } finally {
+      setDeprecatedSaving(false);
+    }
+  }
 
   useEffect(() => {
     api
@@ -54,6 +72,25 @@ export function DetailsTab({
   return (
     <div className="details-layout">
       <div className="details-layout__content">
+        {deprecated && (
+          <div className="banner banner--warning">
+            <span>This endpoint is deprecated.</span>{" "}
+            {deprecatedLocked ? (
+              <span className="muted">Declared in code via @deprecated — remove that tag there to change this.</span>
+            ) : (
+              canEdit && (
+                <button type="button" className="link-button" disabled={deprecatedSaving} onClick={() => toggleDeprecated(false)}>
+                  Mark as not deprecated
+                </button>
+              )
+            )}
+          </div>
+        )}
+        {!deprecated && canEdit && (
+          <button type="button" className="link-button" disabled={deprecatedSaving} onClick={() => toggleDeprecated(true)}>
+            Mark this endpoint as deprecated
+          </button>
+        )}
         {op["x-vayo-possibly-removed-since"] && (
           <div className="banner banner--warning">
             The most recent scan of your API didn't find this route anymore (as of{" "}

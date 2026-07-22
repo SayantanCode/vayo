@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildMountPrefixMap,
   DEFAULT_VALIDATION_MIDDLEWARE_PATTERNS,
+  extractDeprecated,
   extractExplicitGroup,
   extractMiddlewareNames,
   extractSummary,
@@ -202,6 +203,68 @@ describe("extractSummary", () => {
       router.get("/orders/:id", (req, res) => res.json({}));
     `);
     expect(extractSummary(call)).toBe("Fetch a single order by ID.");
+  });
+
+  it("strips the @deprecated tag line out of the shown summary, keeping the description", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * Fetch a single order by ID.
+       * @deprecated
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractSummary(call)).toBe("Fetch a single order by ID.");
+  });
+
+  it("strips both @group and @deprecated tag lines, keeping only the description", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * Fetch a single order by ID.
+       * @group Orders
+       * @deprecated
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractSummary(call)).toBe("Fetch a single order by ID.");
+  });
+});
+
+describe("extractDeprecated", () => {
+  it("returns true for a bare @deprecated tag", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @deprecated
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDeprecated(call)).toBe(true);
+  });
+
+  it("returns true for @deprecated alongside a description and other tags", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * Fetch a single order by ID.
+       * @group Orders
+       * @deprecated
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDeprecated(call)).toBe(true);
+  });
+
+  it("returns false when there's no @deprecated tag", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * Fetch a single order by ID.
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDeprecated(call)).toBe(false);
+  });
+
+  it("returns false when there's no leading comment at all", () => {
+    const call = firstRouteRegistration(`router.get("/orders/:id", (req, res) => res.json({}));`);
+    expect(extractDeprecated(call)).toBe(false);
   });
 });
 

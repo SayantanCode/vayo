@@ -110,16 +110,25 @@ function isFolderOrDescendant(startId: string, targetId: string, allFolders: Fol
  * silent sidebar drag could otherwise leave the docs saying something the
  * codebase itself disagrees with. Such an endpoint can still be reordered
  * among its CURRENT folder's own siblings (`targetFolderId === currentFolderId`)
- * — only a move to a genuinely different folder is blocked. Exported for
- * direct unit testing (see FolderTree.test.ts) — the drag machinery itself
- * isn't practically unit-testable, but this decision is pure and small
- * enough to verify in isolation. */
+ * — only a move to a genuinely different folder is blocked.
+ *
+ * `currentFolderId` is `undefined` exactly when NO placement override
+ * exists yet at all (distinct from `null`, an explicit placement at root)
+ * — a brand new "declared" endpoint `autoOrganizeFolders` hasn't placed
+ * anywhere yet has nothing to diverge from, so its first placement is
+ * never blocked, matching the server-side check in
+ * `packages/server/src/routes/endpoints.ts`'s `/placement` route.
+ *
+ * Exported for direct unit testing (see FolderTree.test.ts) — the drag
+ * machinery itself isn't practically unit-testable, but this decision is
+ * pure and small enough to verify in isolation. */
 export function isBlockedGroupMove(
   groupSource: "declared" | "inferred",
-  currentFolderId: string | null,
+  currentFolderId: string | null | undefined,
   targetFolderId: string | null,
 ): boolean {
-  return groupSource === "declared" && targetFolderId !== currentFolderId;
+  if (groupSource !== "declared" || currentFolderId === undefined) return false;
+  return targetFolderId !== currentFolderId;
 }
 
 type DropPosition = "before" | "after" | "inside";
@@ -317,12 +326,16 @@ export function FolderTree(props: FolderTreeProps): JSX.Element {
 
     const draggedIdentity = nodeIdentity(draggedRow.node);
     // A "declared" group (explicit `@group` tag, docs/04-capture-engine.md
-    // Step 2 #4) locks the endpoint to its current folder — undefined for a
-    // folder row, where this never applies at all.
-    const lockedToFolderId =
-      draggedRow.node.type === "endpoint" && draggedRow.node.endpoint.operation["x-vayo-group-source"] === "declared"
-        ? (draggedRow.node.endpoint.operation["x-vayo-folder-id"] ?? null)
-        : undefined;
+    // Step 2 #4) locks the endpoint to its current folder — "inferred" for
+    // a folder row, where this never applies at all (isBlockedGroupMove
+    // always returns false for it, regardless of the folderId values).
+    // `draggedCurrentFolderId` stays `undefined` (as opposed to `null`) when
+    // no placement override exists yet at all — see isBlockedGroupMove's
+    // own doc comment for why that distinction matters.
+    const draggedGroupSource: "declared" | "inferred" =
+      draggedRow.node.type === "endpoint" ? draggedRow.node.endpoint.operation["x-vayo-group-source"] : "inferred";
+    const draggedCurrentFolderId: string | null | undefined =
+      draggedRow.node.type === "endpoint" ? draggedRow.node.endpoint.operation["x-vayo-folder-id"] : undefined;
     // Uses fullRows (not the collapse-aware `rows`) so a target folder's
     // real existing children are seen even while it's collapsed.
     const sameKindSiblings = (parentId: string | null) =>
@@ -339,7 +352,7 @@ export function FolderTree(props: FolderTreeProps): JSX.Element {
       if (draggedIdentity.kind === "folder" && isFolderOrDescendant(draggedIdentity.id, targetFolderId, props.allFolders)) {
         return; // can't drop a folder into itself or its own descendant
       }
-      if (lockedToFolderId !== undefined && isBlockedGroupMove("declared", lockedToFolderId, targetFolderId)) {
+      if (isBlockedGroupMove(draggedGroupSource, draggedCurrentFolderId, targetFolderId)) {
         props.onBlockedMove(`"${draggedIdentity.label}" is grouped in code via @group — move it there instead of in the sidebar.`);
         return;
       }
@@ -358,7 +371,7 @@ export function FolderTree(props: FolderTreeProps): JSX.Element {
     if (draggedIdentity.kind === "folder" && targetParentId !== null && isFolderOrDescendant(draggedIdentity.id, targetParentId, props.allFolders)) {
       return; // would nest the folder inside itself or its own descendant
     }
-    if (lockedToFolderId !== undefined && isBlockedGroupMove("declared", lockedToFolderId, targetParentId)) {
+    if (isBlockedGroupMove(draggedGroupSource, draggedCurrentFolderId, targetParentId)) {
       props.onBlockedMove(`"${draggedIdentity.label}" is grouped in code via @group — move it there instead of in the sidebar.`);
       return;
     }
@@ -771,7 +784,8 @@ function TreeRow({ row, ...props }: TreeRowProps): JSX.Element {
         />
       ) : (
         <span
-          className="tree-row__label"
+          className={`tree-row__label ${endpoint.operation.deprecated ? "tree-row__label--deprecated" : ""}`}
+          title={endpoint.operation.deprecated ? "Deprecated" : undefined}
           onDoubleClick={
             props.canEdit
               ? (e) => {

@@ -47,6 +47,13 @@ Every transition on this diagram also creates a `version_status` notification
 needs to notice, not just something visible to whoever happens to open the
 Versions panel that day.
 
+**This is a separate concept from `EndpointDoc.deprecated`**
+(`03-data-model.md`, `04-capture-engine.md` Step 2 #4a) — that flags one
+specific *route* deprecated, independent of its version's own lifecycle
+here: a single superseded endpoint (e.g. a legacy search route replaced by
+a newer one) can be marked deprecated while `v1` as a whole stays fully
+`active`, with every other endpoint in it unaffected.
+
 ## Diffing between versions — custom TypeScript diff, not `oasdiff`
 
 This doc originally called for shelling out to `oasdiff`. In practice `oasdiff`
