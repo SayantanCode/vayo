@@ -64,7 +64,7 @@ user's source tree:
 
 1. Call `express-list-endpoints(app)` once against a bootstrapped instance of the
    user's app (`vayo scan`'s `appEntryPath`, from `vayo.config.js` — see
-   `08-packages-and-repo-structure.md`'s `@vayo/cli` section). This is also
+   `08-packages-and-repo-structure.md`'s `vayo` section). This is also
    what makes matching each *static* route registration (found separately via
    `ts-morph`, below) back to its runtime endpoint non-trivial: a real app
    almost always composes routes with `express.Router()` mounted via

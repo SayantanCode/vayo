@@ -1,4 +1,4 @@
-// @vayo/cli — vayo scan: runs @vayo/ast's static pass and merges the result
+// vayo — vayo scan: runs @vayo/ast's static pass and merges the result
 // into vayo_endpoints (docs/04-capture-engine.md Step 2), the same logic
 // apps/demo-app/src/scan.ts proved by hand.
 

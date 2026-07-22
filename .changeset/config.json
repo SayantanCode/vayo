@@ -12,11 +12,11 @@
       "@vayo/capture-express",
       "@vayo/server",
       "@vayo/ui",
-      "@vayo/cli"
+      "vayo"
     ]
   ],
   "linked": [],
-  "access": "restricted",
+  "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": ["@vayo/demo-app"]

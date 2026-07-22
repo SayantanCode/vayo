@@ -30,7 +30,7 @@ gantt
 - `@vayo/types` with every interface from `03-data-model.md`.
 - `@vayo/db-mongo` with `runMigrations` creating all `vayo_*` collections
   and indexes.
-- `@vayo/cli`'s `vayo init` working end-to-end against a real MongoDB URI.
+- `vayo`'s `vayo init` working end-to-end against a real MongoDB URI.
 - **Done when:** running `vayo init` against a fresh Mongo Atlas free-tier
   instance produces all expected collections with correct indexes.
 
@@ -101,7 +101,7 @@ gantt
 - `vayo create-owner` (`packages/cli`) — found via real npm-tarball testing
   that standalone auth mode had no way at all to create the first login;
   `docs/05-security.md` §5 and `08-packages-and-repo-structure.md`'s
-  `@vayo/cli` section now document it as the required bootstrap step.
+  `vayo` section now document it as the required bootstrap step.
 - `bcrypt` bumped `^5.1.1` → `^6.0.0` everywhere it's used
   (`server`/`cli`/`apps/demo-app`) — same hashing API, but 6.x replaced its
   native-build mechanism (`@mapbox/node-pre-gyp` → `node-gyp-build`), which

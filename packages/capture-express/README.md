@@ -29,7 +29,7 @@ The only Vayo package allowed to import Express types — everything
 downstream of it is framework-agnostic.
 
 Typically installed and wired via `vayo init`'s printed snippet — see
-[`@vayo/cli`](https://www.npmjs.com/package/@vayo/cli).
+[`vayo`](https://www.npmjs.com/package/vayo).
 
 ## License
 

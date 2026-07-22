@@ -19,7 +19,7 @@ const { routes } = await scanProject(process.cwd(), config);
 ```
 
 Most people never call this directly —
-[`@vayo/cli`](https://www.npmjs.com/package/@vayo/cli)'s `vayo scan` command
+[`vayo`](https://www.npmjs.com/package/vayo)'s `vayo scan` command
 is the intended entry point. This package exists standalone for anyone
 building custom tooling around the same static pass.
 

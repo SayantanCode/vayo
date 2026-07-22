@@ -1,6 +1,6 @@
 // @vayo/server — Postman collection/environment export. The actual compile
 // logic is framework-agnostic (../postman-export.ts, usable directly by
-// @vayo/cli's `vayo export --format postman` with no running server) — this
+// vayo's `vayo export --format postman` with no running server) — this
 // is just the thin HTTP wrapper around it.
 import { Router } from "express";
 import type { ExampleDoc, ResolvedEndpoint, TestScriptDoc } from "@vayo/types";

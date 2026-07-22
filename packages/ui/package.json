@@ -11,7 +11,7 @@
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "dist-app"],
+  "files": ["dist", "dist-app", "!dist/**/*.test.js", "!dist/**/*.test.d.ts"],
   "scripts": {
     "build": "tsc -b && vite build",
     "dev": "vite"

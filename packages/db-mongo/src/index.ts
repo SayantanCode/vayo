@@ -886,7 +886,7 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
     // caller either wants the mixed list directly (the UI's
     // mostRecentOrPinned prefers a pinned one, falling back to the most
     // recent capture) or filters down to `.pinned` itself (the Postman
-    // export in both @vayo/server and @vayo/cli) — never pre-filter here.
+    // export in both @vayo/server and vayo) — never pre-filter here.
     async listExamples(vayoId: string): Promise<ExampleDoc[]> {
       const db = await getDb();
       const raws = await db

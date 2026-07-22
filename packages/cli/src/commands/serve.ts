@@ -1,4 +1,4 @@
-// @vayo/cli — vayo serve: runs @vayo/server standalone against the same
+// vayo — vayo serve: runs @vayo/server standalone against the same
 // MongoDB the user's capture middleware writes to. Standalone auth mode
 // only — delegated auth (ServerOptions.authMiddleware) needs code specific
 // to the user's own auth system, which a CLI can't generically prompt into

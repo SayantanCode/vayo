@@ -1,4 +1,4 @@
-// @vayo/cli — loads the user's vayo.config.js. Plain JS/ESM, not .ts: the
+// vayo — loads the user's vayo.config.js. Plain JS/ESM, not .ts: the
 // CLI ships as compiled JS with no TS loader bundled, and a bare import() of
 // a .js file needs none — the same mechanism @vayo/ast's scanProject
 // already uses successfully for the user's own app entry.

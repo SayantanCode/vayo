@@ -1,11 +1,11 @@
-// @vayo/cli — vayo create-owner: bootstraps the very first team member
+// vayo — vayo create-owner: bootstraps the very first team member
 // account for standalone auth mode. Without this, a fresh standalone
 // deployment's docs UI shows only a login screen with no way to reach it —
 // the invite flow (packages/server's /api/team/invite) needs an existing
 // owner to send the invite in the first place. Before this command existed,
 // the only place this logic lived was apps/demo-app's private
 // seed-team.ts script, which ships with the monorepo, not with the
-// published @vayo/cli package a real user installs.
+// published vayo package a real user installs.
 
 import bcrypt from "bcrypt";
 import prompts from "prompts";

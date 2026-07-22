@@ -1,4 +1,4 @@
-// @vayo/cli — vayo init: one-time project setup. Never edits the user's
+// vayo — vayo init: one-time project setup. Never edits the user's
 // existing source files — only creates new ones (.env entries,
 // vayo.config.js, a starter AST-entry file) and prints a wiring snippet for
 // the one thing it genuinely can't do safely: mounting capture() into code
