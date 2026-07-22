@@ -42,6 +42,7 @@ export function NotificationBell({ endpoints, memberNames, currentMemberId, onNa
       .catch(() => {});
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(refresh, [config.baseUrl, config.token]);
 
   useEffect(() => {

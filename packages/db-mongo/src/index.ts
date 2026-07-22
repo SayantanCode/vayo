@@ -3,7 +3,6 @@
 // for why: captured schemas are inherently variable-shape.
 
 import {
-  MAX_ATTACHMENT_BYTES,
   type ApiVersionDoc,
   type AttachmentDoc,
   type AuditLogDoc,
