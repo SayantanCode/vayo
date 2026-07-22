@@ -76,6 +76,15 @@ export interface OpenAPIDocument {
   info: { title: string; version: string };
   paths: Record<string, unknown>;
   components?: Record<string, unknown>;
+  /** OpenAPI's own standard tag-declaration list (distinct `group` values,
+   * in first-appearance order) — optional per spec, but populating it is
+   * what lets a *third-party* renderer (real Swagger UI, Redoc, Postman's
+   * import, Stoplight) group operations by tag at all. Without this AND
+   * each operation's own `tags` array (see `buildOperation`), Vayo's
+   * exported spec would still be valid OpenAPI 3.1, but every operation
+   * would show up in one flat, ungrouped list outside Vayo's own UI —
+   * despite Vayo's own sidebar being organized by `group` the whole time. */
+  tags?: Array<{ name: string }>;
 }
 
 export interface ValidationResult {
@@ -205,6 +214,12 @@ function buildOperation(
 ): Record<string, unknown> {
   const operation: Record<string, unknown> = {
     operationId: `${endpoint.method.toLowerCase()}_${endpoint.vayoId}`,
+    // OpenAPI's own standard grouping mechanism — a single-element array
+    // holding the full "/"-separated group path as one tag name (rather
+    // than one tag per path segment), so a nested "Admin/Users" reads as
+    // one unambiguous label in a flat-tag renderer instead of risking two
+    // different "Users" groups (under different parents) merging together.
+    tags: [endpoint.group],
     responses: buildResponses(endpoint.responseSchemas),
     [X_VAYO_ID]: endpoint.vayoId,
     [X_VAYO_GROUP]: endpoint.group,
@@ -259,11 +274,17 @@ function buildDocument(endpoints: ResolvedEndpoint[], version: string): OpenAPID
   const inVersion = endpoints.filter((endpoint) => endpoint.version === version);
   const paths: Record<string, Record<string, unknown>> = {};
   const securitySchemes: Record<string, unknown> = {};
+  // First-appearance order — compile() only ever sees the flat resolved
+  // endpoint list, not vayo_folders' own ordering, so this is the best
+  // available default; still far better for a third-party renderer than
+  // no top-level `tags` declaration at all (see OpenAPIDocument.tags).
+  const seenTags = new Set<string>();
 
   for (const endpoint of inVersion) {
     const path = toOpenApiPath(endpoint.pathTemplate);
     paths[path] ??= {};
     paths[path][endpoint.method.toLowerCase()] = buildOperation(endpoint, securitySchemes);
+    seenTags.add(endpoint.group);
   }
 
   const doc: OpenAPIDocument = {
@@ -271,6 +292,9 @@ function buildDocument(endpoints: ResolvedEndpoint[], version: string): OpenAPID
     info: { title: "Vayo API", version },
     paths,
   };
+  if (seenTags.size > 0) {
+    doc.tags = [...seenTags].map((name) => ({ name }));
+  }
   if (Object.keys(securitySchemes).length > 0) {
     doc.components = { securitySchemes };
   }

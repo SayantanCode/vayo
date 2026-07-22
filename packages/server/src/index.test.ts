@@ -333,6 +333,39 @@ describe("overrides — persistence + audit log", () => {
     const res = await request(app).post("/api/overrides").set("Authorization", `Bearer ${token}`).send({ value: "x" });
     expect(res.status).toBe(400);
   });
+
+  it("refuses to write ${vayoId}.deprecated=false through this generic route too, not just the dedicated /deprecated route", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+    const auth = { Authorization: `Bearer ${token}` };
+
+    const endpoint = await db.upsertStaticResult(
+      { method: "GET", pathTemplate: "/api/v1/legacy", middlewareChain: [], authRequiredGuess: false, scopes: [], group: "Legacy", summary: null, deprecated: true },
+      "v1",
+    );
+    expect(endpoint.deprecatedSource).toBe("declared");
+
+    const res = await request(app).post("/api/overrides").set(auth).send({ targetId: `${endpoint.vayoId}.deprecated`, value: false });
+    expect(res.status).toBe(400);
+  });
+
+  it("refuses to move a 'declared'-group endpoint's folderId through this generic route too, not just /placement", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+    const auth = { Authorization: `Bearer ${token}` };
+
+    const endpoint = await db.upsertStaticResult(
+      { method: "GET", pathTemplate: "/api/v1/admin/users/:id", middlewareChain: [], authRequiredGuess: false, scopes: [], group: "Admin/Users", groupSource: "declared", summary: null },
+      "v1",
+    );
+    await request(app).patch(`/api/endpoints/${endpoint.vayoId}/placement`).set(auth).send({ folderId: "folder_home", order: 0 });
+
+    const res = await request(app).post("/api/overrides").set(auth).send({ targetId: `${endpoint.vayoId}.folderId`, value: "folder_elsewhere" });
+    expect(res.status).toBe(400);
+    expect((await db.getOverride(`${endpoint.vayoId}.folderId`))?.value).toBe("folder_home");
+  });
 });
 
 describe("manual endpoint creation", () => {

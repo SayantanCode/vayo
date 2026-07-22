@@ -813,20 +813,47 @@ function getCleanedLeadingComment(call: CallExpression): string | null {
   return cleaned.length > 0 ? cleaned : null;
 }
 
+/** A route's leading comment is often NOT written for Vayo at all — a
+ * TODO, a workaround explanation, a lint-disable justification — and any
+ * such comment could otherwise accidentally contain text that *looks* like
+ * a `@group`/`@deprecated` tag ("routes moved out of the old @group of
+ * helpers", "the @deprecated flag was removed from the validator") without
+ * meaning to declare anything. Since those two tags carry real behavioral
+ * weight (they lock the endpoint's folder placement / deprecation status
+ * against being changed in the UI — docs/04-capture-engine.md Step 2
+ * #4/#4a), misreading an unrelated comment as one of them would be a real,
+ * silent correctness problem, not just a cosmetic one the way a wrong
+ * `summary` guess would be.
+ *
+ * A bare `@vayo` line anywhere in the comment is the required opt-in
+ * signal — the same role `@swagger`/`@openapi` play in swagger-jsdoc,
+ * marking a comment block as deliberately written for API-doc annotation
+ * rather than incidentally sitting above a route registration. Without it,
+ * `@group`/`@deprecated` are never parsed, no matter what text appears —
+ * they're just prose, exactly as if the tag characters weren't there at
+ * all. This gate does NOT apply to the plain-text summary itself (see
+ * `extractSummary`): a summary being "whatever the nearest comment says" is
+ * the existing, zero-annotation-required M1 behavior and carries no
+ * locking behavior, so there's nothing to guard there. */
+function hasVayoDocSentinel(cleaned: string): boolean {
+  return cleaned.split("\n").some((line) => /^@vayo\b/i.test(line.trim()));
+}
+
 /** JSDoc/leading-comment above a route registration statement, if any —
  * higher fidelity than nothing, never required (docs/04-capture-engine.md
  * Step 2 #6). Absent for the demo app on purpose: the M1 done-when bar
  * requires zero annotations in demo-app's own code. Strips out any
- * `@group`/`@deprecated` tag lines (see `extractExplicitGroup`/
- * `extractDeprecated` below) — same description-vs-structured-tags split
- * swagger-jsdoc itself uses, so a tag doesn't show up twice (once as this
- * summary, once as its own structured field). */
+ * `@vayo`/`@group`/`@deprecated` tag lines (see `hasVayoDocSentinel`/
+ * `extractExplicitGroup`/`extractDeprecated` below) — same
+ * description-vs-structured-tags split swagger-jsdoc itself uses, so a tag
+ * doesn't show up twice (once as this summary, once as its own structured
+ * field). */
 export function extractSummary(call: CallExpression): string | null {
   const cleaned = getCleanedLeadingComment(call);
   if (!cleaned) return null;
   const withoutTags = cleaned
     .split("\n")
-    .filter((line) => !/^@(group|deprecated)\b/i.test(line.trim()))
+    .filter((line) => !/^@(vayo|group|deprecated)\b/i.test(line.trim()))
     .join("\n")
     .trim();
   return withoutTags.length > 0 ? withoutTags : null;
@@ -840,10 +867,12 @@ export function extractSummary(call: CallExpression): string | null {
  * `- description` some tools also allow after the name is trimmed off,
  * since that's redundant with `extractSummary`'s own result. Nested groups
  * follow the same "/"-separated convention `inferGroup` uses, e.g.
- * `@group Admin/Users`. */
+ * `@group Admin/Users`. Only recognized inside a comment carrying the
+ * `@vayo` sentinel (`hasVayoDocSentinel`) — otherwise this text is treated
+ * as ordinary prose, never a declaration. */
 export function extractExplicitGroup(call: CallExpression): string | null {
   const cleaned = getCleanedLeadingComment(call);
-  if (!cleaned) return null;
+  if (!cleaned || !hasVayoDocSentinel(cleaned)) return null;
   for (const line of cleaned.split("\n")) {
     const match = line.trim().match(/^@group\s+([^-]+)/i);
     if (match) {
@@ -861,11 +890,15 @@ export function extractExplicitGroup(call: CallExpression): string | null {
  * be deprecated while the version it belongs to is still fully active.
  * Unlike `@group`, this tag carries no value of its own — its mere
  * presence is the signal, matching how `@deprecated` is used bare in both
- * conventions. */
+ * conventions, so the whole line must be nothing else (a stray "the
+ * @deprecated tag needs cleanup" TODO elsewhere in a legitimately
+ * `@vayo`-tagged block still shouldn't flip this on). Only recognized
+ * inside a comment carrying the `@vayo` sentinel — see
+ * `extractExplicitGroup`'s own comment for why that gate exists at all. */
 export function extractDeprecated(call: CallExpression): boolean {
   const cleaned = getCleanedLeadingComment(call);
-  if (!cleaned) return false;
-  return cleaned.split("\n").some((line) => /^@deprecated\b/i.test(line.trim()));
+  if (!cleaned || !hasVayoDocSentinel(cleaned)) return false;
+  return cleaned.split("\n").some((line) => /^@deprecated$/i.test(line.trim()));
 }
 
 /**

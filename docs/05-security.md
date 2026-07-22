@@ -195,24 +195,40 @@ enforcement. Writes an `endpoint_deleted` audit entry (`03-data-model.md`).
 Two fields carve out a narrow, deliberate exception to this app's usual
 "manual override always wins" rule — everywhere else, a human's edit
 always beats whatever the code or runtime capture says. In both cases
-below, the code is treated as the more authoritative source instead, and
-the restriction is enforced server-side, not just by hiding the control in
-the UI (same posture as every rule in this document):
+below, the code is treated as the more authoritative source instead:
 
-- `PATCH /api/endpoints/:vayoId/placement` (editor) refuses to move an
-  endpoint whose `groupSource` is `"declared"` (an explicit `@group` tag,
-  `04-capture-engine.md` Step 2 #4) to a folder other than its current
-  one — same-folder reordering still goes through. Only applies once a
-  placement override already exists; a brand new "declared" endpoint with
-  no placement yet has nothing to diverge from, so its first placement is
-  never blocked.
-- `PATCH /api/endpoints/:vayoId/deprecated` (editor) refuses to set
-  `deprecated: false` for an endpoint whose `deprecatedSource` is
-  `"declared"` (an explicit `@deprecated` tag, Step 2 #4a). A human can
-  still freely flag any NOT-code-declared endpoint deprecated (or not).
+- **Folder placement**: refuses to move an endpoint whose `groupSource` is
+  `"declared"` (an explicit `@group` tag, `04-capture-engine.md` Step 2 #4)
+  to a folder other than its current one — same-folder reordering still
+  goes through. Only applies once a placement override already exists; a
+  brand new "declared" endpoint with no placement yet has nothing to
+  diverge from, so its first placement is never blocked. If the tag's
+  value later changes, `autoOrganizeFolders` (not a human) is the one path
+  allowed to re-place it, so it never gets stuck (`04-capture-engine.md`
+  Step 2 #4).
+- **Deprecation**: refuses to set `deprecated: false` for an endpoint
+  whose `deprecatedSource` is `"declared"` (an explicit `@deprecated` tag,
+  Step 2 #4a). A human can still freely flag any NOT-code-declared
+  endpoint deprecated (or not).
 
-Both routes 404 for an unknown `vayoId` and require `editor` role, same as
-every other mutating endpoint route.
+Both checks live in exactly one place — `checkOverrideAllowed`
+(`packages/server/src/routes/overrides.ts`) — and are enforced at **every**
+write path capable of setting `folderId` or `deprecated`, not just the two
+purpose-built REST routes (`PATCH /api/endpoints/:vayoId/placement`,
+`PATCH /api/endpoints/:vayoId/deprecated`, both editor-role, both 404 for
+an unknown `vayoId`). Two other paths accept an arbitrary caller-supplied
+field path and would otherwise bypass both locks entirely: the generic
+`POST /api/overrides` route, and the Socket.IO `override:updated` event
+(`realtime.ts`) — both call `checkOverrideAllowed` before writing, exactly
+the "never trust what the UI already hid" posture as every other rule in
+this document, applied here to "don't trust that only the purpose-built
+route will ever be the one making this particular write." Deliberately
+**not** built into `applyOverride` itself (the function all of the above
+ultimately call): folder deletion's reparenting call (`routes/folders.ts`)
+legitimately needs to relocate a "declared" endpoint out of a folder that
+no longer exists, with no reasonable alternative — `applyOverride` stays a
+trusting low-level primitive, and it's each caller's job to check first
+when the field path comes from outside this codebase's own control.
 
 ## 5. Docs-viewer authentication
 

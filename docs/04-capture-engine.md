@@ -112,27 +112,91 @@ user's source tree:
    (swagger-jsdoc's own convention, e.g. `@group Orders` or a nested
    `@group Admin/Users`) wins outright over both this convention and the
    URL-segment fallback — `EndpointDoc.groupSource` records "declared" when
-   this tag produced `group`, "inferred" otherwise. `autoOrganizeFolders`
-   (`@vayo/db-mongo`) turns a "/"-separated `group` into real nested sidebar
-   folders, creating (or reusing) one folder per segment; a flat,
-   single-segment group still resolves to exactly the one top-level folder
-   it always did. A "declared" grouping is treated as authoritative:
-   such an endpoint can be reordered among its current folder's own
-   siblings via drag-and-drop, but a move to a different folder is refused
-   — both in the sidebar (`FolderTree.tsx`'s `isBlockedGroupMove`) AND, more
-   importantly, server-side in `PATCH /api/endpoints/:vayoId/placement`
-   (`packages/server/src/routes/endpoints.ts`), since a client-side-only
-   guard is not a real guarantee (a direct API call would otherwise bypass
-   it entirely — the same "never trust what the UI already hid" posture as
-   every other rule in that file). The lock only ever applies once a
-   placement already exists: a brand new "declared" endpoint
+   this tag produced `group`, "inferred" otherwise. **Only recognized
+   inside a comment that also carries a bare `@vayo` sentinel line** (see
+   "Disambiguating a doc comment from an ordinary one" below) — a route's
+   leading comment is often written for something else entirely (a TODO, a
+   workaround note), and `@group`/`@deprecated` carry real behavioral
+   weight, so an unrelated comment must never be misread as a declaration.
+   `autoOrganizeFolders` (`@vayo/db-mongo`) turns a "/"-separated `group`
+   into real nested sidebar folders, creating (or reusing) one folder per
+   segment; a flat, single-segment group still resolves to exactly the one
+   top-level folder it always did. A "declared" grouping is treated as
+   authoritative: such an endpoint can be reordered among its current
+   folder's own siblings via drag-and-drop, but a move to a different
+   folder is refused — checked once, in `checkOverrideAllowed`
+   (`packages/server/src/routes/overrides.ts`), and enforced at every
+   write path that can set `folderId` (the dedicated `PATCH
+   /api/endpoints/:vayoId/placement` route, the generic `POST
+   /api/overrides` route, AND the Socket.IO `override:updated` event) —
+   not just hidden in the sidebar UI (`FolderTree.tsx`'s
+   `isBlockedGroupMove`), since a client-side-only guard, or a check on only
+   ONE of several write paths, is not a real guarantee. The lock only ever
+   applies once a placement already exists: a brand new "declared" endpoint
    `autoOrganizeFolders` hasn't placed anywhere yet has nothing to diverge
-   from, so its very first placement always goes through. This is a
+   from, so its very first placement always goes through. If the tag's
+   VALUE later changes (e.g. `@group Admin/Users` renamed to `@group
+   Admin/Customers`) after the endpoint was already placed, the lock would
+   otherwise leave it stuck in the old folder forever — `autoOrganizeFolders`
+   is the one place a "declared" endpoint's placement is allowed to
+   self-heal: it re-places (only) a "declared" endpoint whose current
+   folder no longer matches its current `group`, leaving its `order` (and
+   everything else) untouched when the folder already matches. This is a
    deliberate, narrow exception to the "manual override always wins"
    philosophy every other field in this app follows; it applies only to
    folder placement, and only when the group came from an explicit tag —
    an inferred group (file convention or URL guess) stays fully
    drag-and-drop-able, same as before.
+5. **Standard OpenAPI `tags`, not just `x-vayo-group`.** `group` also
+   becomes a real, standard OpenAPI `tags: [group]` array on the operation
+   (one tag, the full "/"-separated path as a single string — not one tag
+   per segment, since a flat-tag renderer has no concept of nesting and
+   two different "Users" groups under different parents would otherwise
+   collide into one) plus a top-level `tags: [{name}, ...]` declaration
+   listing every distinct group in first-appearance order
+   (`@vayo/openapi-compiler`'s `buildDocument`/`buildOperation`). Without
+   this, `x-vayo-group` alone would only ever group operations inside
+   Vayo's own UI — the exported spec, opened in an actual third-party
+   Swagger UI, Postman import, or Redoc, would show every operation in one
+   flat, ungrouped list despite Vayo's own sidebar being organized by group
+   the whole time. `EndpointDoc`/`vayo_folders` stay the source of truth;
+   this is purely an output-side addition with no new stored field.
+
+## Disambiguating a doc comment from an ordinary one
+
+A route's leading comment is frequently NOT written for Vayo at all — a
+TODO, a lint-disable justification, an explanation of a workaround — and
+such a comment could easily contain text that *looks* like a tag without
+meaning to declare anything ("routes moved out of the old `@group` of
+helpers", "the `@deprecated` flag was removed from the validator"). Since
+`@group`/`@deprecated` carry real behavioral weight (they lock an
+endpoint's folder placement / deprecation status against being changed in
+the UI — #4/#4a above), misreading an unrelated comment as one of them
+would be a silent correctness problem, not just a cosmetic wrong-guess the
+way an odd `summary` would be.
+
+A bare `@vayo` line anywhere in the comment is the required opt-in signal
+— the same role `@swagger`/`@openapi` play in swagger-jsdoc, marking a
+comment block as deliberately written for API-doc annotation rather than
+incidentally sitting above a route registration. Without it, `@group`/
+`@deprecated` are never parsed, no matter what text appears in the comment
+— they're just prose, exactly as if the tag characters weren't there at
+all (`@vayo/ast`'s `hasVayoDocSentinel`). This gate does **not** apply to
+the plain-text `summary` itself: a summary being "whatever the nearest
+comment says" is the existing, zero-annotation-required M1 behavior and
+carries no locking behavior, so there's nothing to guard there — the
+`@vayo` line (like `@group`/`@deprecated`) is simply stripped out of the
+displayed summary text when present, same as those two.
+
+```js
+/**
+ * Fetch a single order by ID.
+ * @vayo
+ * @group Orders
+ * @deprecated
+ */
+router.get("/orders/:id", getOrder);
+```
 
 ## Step 2 #3b — Mongoose model extraction (when there's no Zod schema to trace)
 
@@ -195,18 +259,26 @@ Object field, not an `x-vayo-*` extension) and `deprecatedSource:
 deprecated while the version it belongs to is still fully active. Unlike
 `group`, there's no inferred/guessed "probably deprecated" signal — the
 tag's mere presence is the whole signal, so `deprecated` is simply `false`
-and `deprecatedSource` is `null` whenever it's absent.
+and `deprecatedSource` is `null` whenever it's absent. Like `@group`, only
+recognized inside a comment that also carries the `@vayo` sentinel line
+(see "Disambiguating a doc comment from an ordinary one" above), and the
+whole line must be nothing but `@deprecated` — a stray "the `@deprecated`
+tag needs cleanup" TODO elsewhere in an otherwise legitimately
+`@vayo`-tagged block still shouldn't flip this on.
 
 A human can still flag ANY endpoint deprecated through the UI even when
 the code hasn't said so (a normal override on `${vayoId}.deprecated`,
 freely reversible like any other field) — but once `deprecatedSource` is
-`"declared"`, the UI can't un-deprecate it, enforced in `PATCH
-/api/endpoints/:vayoId/deprecated` server-side (not just a hidden toggle),
-the same narrow, deliberate exception to "manual override always wins"
-that `groupSource: "declared"` already carves out for folder placement,
-above. Re-declaring an already-`true` value (whether code-declared or
-human-set) is treated as a no-op, not an error, since it isn't actually
-contradicting anything.
+`"declared"`, the UI can't un-deprecate it. Checked once, in
+`checkOverrideAllowed` (`packages/server/src/routes/overrides.ts`), and
+enforced at every write path that can set `deprecated` (the dedicated
+`PATCH /api/endpoints/:vayoId/deprecated` route, the generic `POST
+/api/overrides` route, AND the Socket.IO `override:updated` event) — not
+just a hidden UI toggle, the same narrow, deliberate exception to "manual
+override always wins" that `groupSource: "declared"` already carves out
+for folder placement, above. Re-declaring an already-`true` value (whether
+code-declared or human-set) is treated as a no-op, not an error, since it
+isn't actually contradicting anything.
 
 ## Step 3 — Merge precedence (static vs. runtime vs. override)
 

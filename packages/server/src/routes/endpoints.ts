@@ -3,7 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireRole, type VayoAuthedRequest } from "../auth-middleware.js";
 import { autoCatchAsyncErrors } from "../error-handling.js";
-import { applyOverride } from "./overrides.js";
+import { applyOverride, checkOverrideAllowed } from "./overrides.js";
 import type { RouteDeps } from "../server-deps.js";
 
 const manualEndpointBodySchema = z.object({
@@ -69,23 +69,21 @@ export function createEndpointsRouter({ db }: RouteDeps): Router {
       return;
     }
     // A "declared" group (an explicit @group tag in code,
-    // docs/04-capture-engine.md Step 2 #4) locks folder PLACEMENT — checked
-    // here, not just in the sidebar UI, since a client-side-only guard
-    // isn't a real guarantee (same "never trust what the UI already hid"
-    // posture as every other rule in this file). Same-folder reordering
-    // (an order-only change) still goes through. Only applies once a
-    // placement override actually EXISTS — a brand new "declared" endpoint
-    // that autoOrganizeFolders (or this very route) hasn't placed anywhere
-    // yet has nothing to diverge from, so its first placement always goes
-    // through unrestricted.
-    if (endpoint.groupSource === "declared") {
-      const folderOverride = (await db.listOverrides(vayoId)).find((o) => o.targetId === `${vayoId}.folderId`);
-      if (folderOverride && parsed.data.folderId !== (folderOverride.value as string | null)) {
-        res.status(400).json({
-          error: "this endpoint's group is declared in code via @group — move it there instead of in the sidebar",
-        });
-        return;
-      }
+    // docs/04-capture-engine.md Step 2 #4) locks folder PLACEMENT —
+    // checked here (via the same `checkOverrideAllowed` the generic
+    // /api/overrides route and the Socket.IO transport also enforce, so
+    // there's exactly one place this rule lives), not just in the sidebar
+    // UI, since a client-side-only guard isn't a real guarantee (same
+    // "never trust what the UI already hid" posture as every other rule in
+    // this file). Same-folder reordering (an order-only change) still goes
+    // through. Only applies once a placement override actually EXISTS — a
+    // brand new "declared" endpoint that autoOrganizeFolders (or this very
+    // route) hasn't placed anywhere yet has nothing to diverge from, so its
+    // first placement always goes through unrestricted.
+    const blockedReason = await checkOverrideAllowed(db, `${vayoId}.folderId`, parsed.data.folderId);
+    if (blockedReason) {
+      res.status(400).json({ error: blockedReason });
+      return;
     }
     await applyOverride(db, req.vayoAuth!.memberId, `${vayoId}.folderId`, parsed.data.folderId, null);
     await applyOverride(db, req.vayoAuth!.memberId, `${vayoId}.order`, parsed.data.order, null);
@@ -95,11 +93,13 @@ export function createEndpointsRouter({ db }: RouteDeps): Router {
   // A human can freely flag ANY endpoint deprecated (or not) — EXCEPT
   // un-deprecating one whose `deprecatedSource` is "declared", meaning an
   // explicit `@deprecated` tag in the route's own code produced it
-  // (docs/04-capture-engine.md Step 2 #4a). Checked here server-side, not
-  // just left to the UI to hide the toggle — same "never trust what the UI
-  // already hid" posture as the placement lock above. Re-declaring an
-  // already-`true` value (whether code-declared or human-set) is a no-op,
-  // not an error — it isn't actually contradicting anything.
+  // (docs/04-capture-engine.md Step 2 #4a). Checked here via the same
+  // `checkOverrideAllowed` the generic /api/overrides route and the
+  // Socket.IO transport also enforce (one shared place this rule lives),
+  // not just left to the UI to hide the toggle — same "never trust what
+  // the UI already hid" posture as the placement lock above. Re-declaring
+  // an already-`true` value (whether code-declared or human-set) is a
+  // no-op, not an error — it isn't actually contradicting anything.
   router.patch("/api/endpoints/:vayoId/deprecated", requireRole("editor"), async (req: VayoAuthedRequest, res) => {
     const parsed = deprecatedBodySchema.safeParse(req.body);
     if (!parsed.success) {
@@ -112,10 +112,9 @@ export function createEndpointsRouter({ db }: RouteDeps): Router {
       res.status(404).json({ error: "not found" });
       return;
     }
-    if (endpoint.deprecatedSource === "declared" && !parsed.data.deprecated) {
-      res.status(400).json({
-        error: "this endpoint is declared deprecated in code via @deprecated — remove the tag there instead",
-      });
+    const blockedReason = await checkOverrideAllowed(db, `${vayoId}.deprecated`, parsed.data.deprecated);
+    if (blockedReason) {
+      res.status(400).json({ error: blockedReason });
       return;
     }
     await applyOverride(db, req.vayoAuth!.memberId, `${vayoId}.deprecated`, parsed.data.deprecated, parsed.data.reason ?? null);

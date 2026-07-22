@@ -711,6 +711,76 @@ describe("createAdapter — folders", () => {
     expect(folder?.name).toBe("Orders");
     expect(folder?.parentId).toBeNull();
   });
+
+  it("re-syncs a 'declared' endpoint's placement when its @group value changes between scans", async () => {
+    const first = await adapter.upsertStaticResult(
+      staticRoute({ pathTemplate: "/api/v1/admin/users/:id", group: "Admin/Users", groupSource: "declared" }),
+      "v1",
+    );
+    await adapter.autoOrganizeFolders("v1", "owner_1");
+    const originalPlacement = await adapter.getOverride(`${first.vayoId}.folderId`);
+    const originalFolder = await adapter.getFolder(originalPlacement!.value as string);
+    expect(originalFolder?.name).toBe("Users");
+
+    // The @group tag's VALUE changed on a later scan (e.g. renamed in code)
+    // — the endpoint's placement lock (server route) would otherwise leave
+    // it stuck in the old folder forever, since a human can never move a
+    // "declared" endpoint away from its current folder. autoOrganizeFolders
+    // is the one place this is allowed to self-heal.
+    const rescanned = await adapter.upsertStaticResult(
+      staticRoute({ pathTemplate: "/api/v1/admin/users/:id", group: "Admin/Customers", groupSource: "declared" }),
+      "v1",
+    );
+    const result = await adapter.autoOrganizeFolders("v1", "owner_1");
+    expect(result.endpointsPlaced).toBe(1); // re-placed, not skipped
+
+    const newPlacement = await adapter.getOverride(`${rescanned.vayoId}.folderId`);
+    expect(newPlacement?.value).not.toBe(originalPlacement?.value);
+    const newFolder = await adapter.getFolder(newPlacement!.value as string);
+    expect(newFolder?.name).toBe("Customers");
+    const newParent = await adapter.getFolder(newFolder!.parentId!);
+    expect(newParent?.name).toBe("Admin");
+  });
+
+  it("leaves a 'declared' endpoint's placement (and order) untouched when its @group value hasn't changed", async () => {
+    const endpoint = await adapter.upsertStaticResult(
+      staticRoute({ pathTemplate: "/api/v1/admin/users/:id", group: "Admin/Users", groupSource: "declared" }),
+      "v1",
+    );
+    await adapter.autoOrganizeFolders("v1", "owner_1");
+    const placementBefore = await adapter.getOverride(`${endpoint.vayoId}.folderId`);
+
+    // A human reorders it among its (correct, unchanged) folder's siblings —
+    // this must survive a later re-scan/re-organize untouched.
+    await adapter.upsertOverride({
+      targetId: `${endpoint.vayoId}.order`,
+      value: 7,
+      updatedBy: "owner_1",
+      updatedAt: "2026-07-01T00:00:00.000Z",
+      reason: null,
+    });
+
+    await adapter.upsertStaticResult(staticRoute({ pathTemplate: "/api/v1/admin/users/:id", group: "Admin/Users", groupSource: "declared" }), "v1");
+    const result = await adapter.autoOrganizeFolders("v1", "owner_1");
+    expect(result.endpointsPlaced).toBe(0); // already correctly placed — skipped entirely
+
+    const placementAfter = await adapter.getOverride(`${endpoint.vayoId}.folderId`);
+    expect(placementAfter?.value).toBe(placementBefore?.value);
+    expect((await adapter.getOverride(`${endpoint.vayoId}.order`))?.value).toBe(7); // untouched
+  });
+
+  it("never re-syncs an 'inferred'-group endpoint's placement, even if its group value changes", async () => {
+    const endpoint = await adapter.upsertStaticResult(staticRoute({ pathTemplate: "/api/v1/widgets/:id", group: "Widgets" }), "v1");
+    await adapter.autoOrganizeFolders("v1", "owner_1");
+    const placementBefore = await adapter.getOverride(`${endpoint.vayoId}.folderId`);
+
+    await adapter.upsertStaticResult(staticRoute({ pathTemplate: "/api/v1/widgets/:id", group: "Gadgets" }), "v1");
+    const result = await adapter.autoOrganizeFolders("v1", "owner_1");
+    expect(result.endpointsPlaced).toBe(0);
+
+    const placementAfter = await adapter.getOverride(`${endpoint.vayoId}.folderId`);
+    expect(placementAfter?.value).toBe(placementBefore?.value); // a human's own reorg is never overridden for an inferred group
+  });
 });
 
 describe("createAdapter — comment flagging", () => {
