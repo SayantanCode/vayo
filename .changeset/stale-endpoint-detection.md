@@ -5,7 +5,7 @@
 "@vayo/openapi-compiler": patch
 "@vayo/server": patch
 "@vayo/ui": patch
-"@vayo/cli": patch
+"vayo": patch
 ---
 
 `vayo scan` now flags endpoints it no longer finds in a static/merged
