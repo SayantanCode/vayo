@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { CalendarClock, CircleStop, Copy, CornerUpLeft, Download, File, Flag, MonitorPlay, Paperclip, Search, X } from "lucide-react";
+import { CalendarClock, CircleStop, CornerUpLeft, File, Flag, MonitorPlay, Paperclip, Search, X } from "lucide-react";
 import type { AttachmentDoc, CommentDoc } from "@vayo/types";
 import { api, ApiError } from "../../api.js";
 import { applyMentionSelection, detectMentionTrigger, type MentionTrigger } from "../../mentions.js";
 import { DATE_FILTERS, DATE_FILTER_LABELS, matchesDateFilter, type DateFilter } from "../../chat-filters.js";
 import { MessageBody } from "../MessageBody.js";
 import type { EndpointSummary } from "../../types.js";
-import { useDismiss } from "../../hooks/useDismiss.js";
 import { useConfig } from "../../contexts/ConfigContext.js";
 import { useSocket } from "../../contexts/SocketContext.js";
 import { AttachmentPreview, ChatContextMenu, DateJumpPopover, snippet } from "./team-chat-pieces.js";

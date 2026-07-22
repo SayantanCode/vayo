@@ -26,7 +26,6 @@ import {
   findMatches,
   FORMAT_LABELS,
   formatBytes,
-  getHeaderValue,
   HighlightedText,
   isBinaryContentType,
   LARGE_RESPONSE_THRESHOLD,

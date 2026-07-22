@@ -54,10 +54,12 @@ very good reason, stated explicitly in the PR description:
    is exempt: it's Vayo's own REST API server, built on Express as its own
    implementation choice, which is a different thing from the user's captured
    app potentially being on a different stack — see
-   `docs/08-packages-and-repo-structure.md`'s closing section. Run
-   `pnpm check:boundaries` before opening a PR that touches any of those four
-   packages — it's a cheap grep-based guard, not a full ESLint rule yet, but
-   it catches the mistake immediately.
+   `docs/08-packages-and-repo-structure.md`'s closing section. Enforced two
+   ways, both run in CI: `pnpm lint` (a real ESLint `no-restricted-imports`
+   rule, `.eslintrc.cjs`) and `pnpm check:boundaries` (a cheap,
+   dependency-free grep-based guard checking the identical rule) — run
+   either locally before opening a PR that touches any of those four
+   packages.
 
 ## Adding a new capture-`<stack>` package (e.g. `capture-fastify`)
 
@@ -109,9 +111,10 @@ doing their job:
 
 ## Opening a PR
 
-- Run `pnpm build && pnpm test` and make sure both are clean.
+- Run `pnpm build && pnpm lint && pnpm test` and make sure all three are clean.
 - If you touched `schema-engine`, `openapi-compiler`, `db-mongo`, `server`,
-  or `ui`, run `pnpm check:boundaries`.
+  or `ui`, also run `pnpm check:boundaries` (`pnpm lint` already covers the
+  same rule, but the standalone script is a useful quick check while iterating).
 - If you changed a shape in `@vayo/types`, update the matching section of
   `docs/03-data-model.md` in the same commit — they must never drift apart.
 - Describe *why*, not just *what*, in the PR description — especially for

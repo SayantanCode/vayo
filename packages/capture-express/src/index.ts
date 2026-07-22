@@ -269,6 +269,9 @@ export function unsupportedExpressVersionWarning(installedVersion: string): stri
  * be worse than the risk it's guarding against. */
 function warnIfUnsupportedExpressVersion(): void {
   try {
+    // A dynamic require, not a static import — reading the consumer's
+    // actually-installed version at runtime, not code this package ships.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { version } = require("express/package.json") as { version: string };
     const message = unsupportedExpressVersionWarning(version);
     if (message) console.warn(message);

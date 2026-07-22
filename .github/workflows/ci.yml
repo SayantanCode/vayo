@@ -43,10 +43,16 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # Enforces CLAUDE.md's non-negotiable #5 (schema-engine,
+      # A real ESLint rule now (`.eslintrc.cjs`'s `no-restricted-imports`
+      # override) formalizes CLAUDE.md's non-negotiable #5 — schema-engine,
       # openapi-compiler, db-mongo, and ui must never import Express/any
-      # web-framework types) — a cheap grep-based guard, not a full ESLint
-      # rule yet (see CONTRIBUTING.md), but real and checked on every PR.
+      # web-framework types.
+      - name: Lint
+        run: pnpm lint
+
+      # Kept alongside the ESLint rule above as a second, dependency-free
+      # check of the exact same boundary (CONTRIBUTING.md) — cheap enough
+      # that the redundancy costs nothing.
       - name: Check package boundaries
         run: pnpm check:boundaries
 

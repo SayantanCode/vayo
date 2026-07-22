@@ -19,7 +19,7 @@ latter a full Postman-parity request client), API versioning + spec
 diffing, an in-app notification center, and the `vayo` CLI
 (`init`/`scan`/`export`/`create-owner`/`serve`/`diff`).
 
-502 tests across all 9 packages (`pnpm test` from the repo root).
+575 tests across all 9 packages (`pnpm test` from the repo root).
 `docs/09-roadmap.md` tracks the full build sequence and each milestone's
 "done when" bar; M7 (this launch-readiness pass) is in progress — the
 packages stay `"private": true` in each `package.json` until npm publish is
