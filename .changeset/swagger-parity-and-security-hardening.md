@@ -6,7 +6,7 @@
 "@vayo/openapi-compiler": patch
 "@vayo/server": patch
 "@vayo/ui": patch
-"@vayo/cli": patch
+"vayo": patch
 ---
 
 A focused review pass over the two most recent additions (`@group`,

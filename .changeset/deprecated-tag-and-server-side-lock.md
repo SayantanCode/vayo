@@ -6,7 +6,7 @@
 "@vayo/openapi-compiler": patch
 "@vayo/server": patch
 "@vayo/ui": patch
-"@vayo/cli": patch
+"vayo": patch
 ---
 
 Added a Swagger/swagger-jsdoc-style explicit `@deprecated` tag: a route's
