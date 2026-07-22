@@ -976,6 +976,223 @@ describe("folders", () => {
   });
 });
 
+describe("PATCH /api/endpoints/:vayoId/placement — declared group lock", () => {
+  it("refuses to move a 'declared'-group endpoint to a different folder, even via a direct API call", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+    const auth = { Authorization: `Bearer ${token}` };
+
+    const endpoint = await db.upsertStaticResult(
+      {
+        method: "GET",
+        pathTemplate: "/api/v1/admin/users/:id",
+        middlewareChain: [],
+        authRequiredGuess: false,
+        scopes: [],
+        group: "Admin/Users",
+        groupSource: "declared",
+        summary: null,
+      },
+      "v1",
+    );
+    const homeFolder = await request(app).post("/api/folders").set(auth).send({ name: "Users", parentId: null, version: "v1" });
+    const otherFolder = await request(app).post("/api/folders").set(auth).send({ name: "Somewhere else", parentId: null, version: "v1" });
+
+    // Establish an initial placement first — a brand new "declared" endpoint
+    // with no placement override yet has nothing to diverge from, so only a
+    // SECOND, different placement attempt should ever be refused.
+    await request(app).patch(`/api/endpoints/${endpoint.vayoId}/placement`).set(auth).send({ folderId: homeFolder.body._id, order: 0 });
+
+    const res = await request(app)
+      .patch(`/api/endpoints/${endpoint.vayoId}/placement`)
+      .set(auth)
+      .send({ folderId: otherFolder.body._id, order: 0 });
+    expect(res.status).toBe(400);
+    expect((await db.getOverride(`${endpoint.vayoId}.folderId`))?.value).toBe(homeFolder.body._id);
+  });
+
+  it("still allows reordering a 'declared'-group endpoint within its current folder", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+    const auth = { Authorization: `Bearer ${token}` };
+
+    const endpoint = await db.upsertStaticResult(
+      {
+        method: "GET",
+        pathTemplate: "/api/v1/admin/users/:id",
+        middlewareChain: [],
+        authRequiredGuess: false,
+        scopes: [],
+        group: "Admin/Users",
+        groupSource: "declared",
+        summary: null,
+      },
+      "v1",
+    );
+    const folder = await request(app).post("/api/folders").set(auth).send({ name: "Users", parentId: null, version: "v1" });
+    // First placement — establishes its "current" folder.
+    await request(app).patch(`/api/endpoints/${endpoint.vayoId}/placement`).set(auth).send({ folderId: folder.body._id, order: 0 });
+
+    // Same folder, different order — must go through.
+    const res = await request(app)
+      .patch(`/api/endpoints/${endpoint.vayoId}/placement`)
+      .set(auth)
+      .send({ folderId: folder.body._id, order: 3 });
+    expect(res.status).toBe(204);
+    expect((await db.getOverride(`${endpoint.vayoId}.order`))?.value).toBe(3);
+  });
+
+  it("allows the very first placement of a 'declared'-group endpoint that has never been placed anywhere yet", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+    const auth = { Authorization: `Bearer ${token}` };
+
+    const endpoint = await db.upsertStaticResult(
+      {
+        method: "GET",
+        pathTemplate: "/api/v1/admin/users/:id",
+        middlewareChain: [],
+        authRequiredGuess: false,
+        scopes: [],
+        group: "Admin/Users",
+        groupSource: "declared",
+        summary: null,
+      },
+      "v1",
+    );
+    const folder = await request(app).post("/api/folders").set(auth).send({ name: "Users", parentId: null, version: "v1" });
+
+    const res = await request(app).patch(`/api/endpoints/${endpoint.vayoId}/placement`).set(auth).send({ folderId: folder.body._id, order: 0 });
+    expect(res.status).toBe(204);
+    expect((await db.getOverride(`${endpoint.vayoId}.folderId`))?.value).toBe(folder.body._id);
+  });
+
+  it("does not restrict an 'inferred'-group endpoint's placement at all", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+    const auth = { Authorization: `Bearer ${token}` };
+
+    const endpoint = await db.upsertStaticResult(
+      {
+        method: "GET",
+        pathTemplate: "/api/v1/widgets/:id",
+        middlewareChain: [],
+        authRequiredGuess: false,
+        scopes: [],
+        group: "Widgets",
+        groupSource: "inferred",
+        summary: null,
+      },
+      "v1",
+    );
+    const folder = await request(app).post("/api/folders").set(auth).send({ name: "Anywhere", parentId: null, version: "v1" });
+
+    const res = await request(app)
+      .patch(`/api/endpoints/${endpoint.vayoId}/placement`)
+      .set(auth)
+      .send({ folderId: folder.body._id, order: 0 });
+    expect(res.status).toBe(204);
+  });
+});
+
+describe("PATCH /api/endpoints/:vayoId/deprecated", () => {
+  it("lets a human flag a not-code-declared endpoint deprecated, and un-deprecate it again", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+    const auth = { Authorization: `Bearer ${token}` };
+
+    const created = await request(app)
+      .post("/api/endpoints/manual")
+      .set(auth)
+      .send({ method: "get", pathTemplate: "/api/v1/widgets", version: "v1", group: "Widgets", summary: null });
+
+    const flagged = await request(app).patch(`/api/endpoints/${created.body.vayoId}/deprecated`).set(auth).send({ deprecated: true });
+    expect(flagged.status).toBe(204);
+    expect((await db.getOverride(`${created.body.vayoId}.deprecated`))?.value).toBe(true);
+
+    const unflagged = await request(app).patch(`/api/endpoints/${created.body.vayoId}/deprecated`).set(auth).send({ deprecated: false });
+    expect(unflagged.status).toBe(204);
+    expect((await db.getOverride(`${created.body.vayoId}.deprecated`))?.value).toBe(false);
+  });
+
+  it("refuses to un-deprecate an endpoint whose deprecatedSource is 'declared'", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+    const auth = { Authorization: `Bearer ${token}` };
+
+    const endpoint = await db.upsertStaticResult(
+      {
+        method: "GET",
+        pathTemplate: "/api/v1/legacy",
+        middlewareChain: [],
+        authRequiredGuess: false,
+        scopes: [],
+        group: "Legacy",
+        summary: null,
+        deprecated: true,
+      },
+      "v1",
+    );
+    expect(endpoint.deprecatedSource).toBe("declared");
+
+    const res = await request(app).patch(`/api/endpoints/${endpoint.vayoId}/deprecated`).set(auth).send({ deprecated: false });
+    expect(res.status).toBe(400);
+    expect(await db.getOverride(`${endpoint.vayoId}.deprecated`)).toBeNull();
+  });
+
+  it("allows re-declaring an already-true 'declared' deprecation as a no-op", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+    const auth = { Authorization: `Bearer ${token}` };
+
+    const endpoint = await db.upsertStaticResult(
+      {
+        method: "GET",
+        pathTemplate: "/api/v1/legacy",
+        middlewareChain: [],
+        authRequiredGuess: false,
+        scopes: [],
+        group: "Legacy",
+        summary: null,
+        deprecated: true,
+      },
+      "v1",
+    );
+
+    const res = await request(app).patch(`/api/endpoints/${endpoint.vayoId}/deprecated`).set(auth).send({ deprecated: true });
+    expect(res.status).toBe(204);
+  });
+
+  it("404s for a vayoId that doesn't exist", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+    const res = await request(app)
+      .patch("/api/endpoints/no-such-vayo-id/deprecated")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ deprecated: true });
+    expect(res.status).toBe(404);
+  });
+
+  it("403s for a viewer (editor role required)", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "viewer");
+    const res = await request(app)
+      .patch("/api/endpoints/no-such-vayo-id/deprecated")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ deprecated: true });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("team & invites", () => {
   it("never includes passwordHash in the team list, even for an owner", async () => {
     const db = createFakeDb();

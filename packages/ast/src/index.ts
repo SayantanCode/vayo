@@ -60,6 +60,12 @@ export interface StaticRouteResult {
    * that would silently diverge from what the code itself says. */
   groupSource: "declared" | "inferred";
   summary: string | null;
+  /** True when an explicit bare `@deprecated` tag was found in the route's
+   * leading comment (the same OpenAPI/swagger-jsdoc convention `deprecated:
+   * true` on an Operation Object mirrors) — docs/04-capture-engine.md Step
+   * 2 #4a. Always `false` when absent; there's no inferred/guessed
+   * "probably deprecated" signal the way `group` has multiple fallbacks. */
+  deprecated: boolean;
   /** A Zod- or Mongoose-derived request body shape, when one could be
    * traced statically — see `findRequestSchemaForRoute`/
    * `findMongooseRequestSchemaForRoute` below. `null` (not an empty
@@ -811,15 +817,16 @@ function getCleanedLeadingComment(call: CallExpression): string | null {
  * higher fidelity than nothing, never required (docs/04-capture-engine.md
  * Step 2 #6). Absent for the demo app on purpose: the M1 done-when bar
  * requires zero annotations in demo-app's own code. Strips out any
- * `@group` tag line (see `extractExplicitGroup` below) — same
- * description-vs-structured-tags split swagger-jsdoc itself uses, so the
- * tag doesn't show up twice (once as this summary, once as the group). */
+ * `@group`/`@deprecated` tag lines (see `extractExplicitGroup`/
+ * `extractDeprecated` below) — same description-vs-structured-tags split
+ * swagger-jsdoc itself uses, so a tag doesn't show up twice (once as this
+ * summary, once as its own structured field). */
 export function extractSummary(call: CallExpression): string | null {
   const cleaned = getCleanedLeadingComment(call);
   if (!cleaned) return null;
   const withoutTags = cleaned
     .split("\n")
-    .filter((line) => !/^@group\b/i.test(line.trim()))
+    .filter((line) => !/^@(group|deprecated)\b/i.test(line.trim()))
     .join("\n")
     .trim();
   return withoutTags.length > 0 ? withoutTags : null;
@@ -845,6 +852,20 @@ export function extractExplicitGroup(call: CallExpression): string | null {
     }
   }
   return null;
+}
+
+/** Bare `@deprecated` tag in the same leading comment `extractSummary`
+ * reads — the OpenAPI/swagger-jsdoc convention for marking a specific
+ * route deprecated in code, independent of the whole API *version*'s own
+ * lifecycle (`ApiVersionDoc.status`, `07-api-versioning.md`): a route can
+ * be deprecated while the version it belongs to is still fully active.
+ * Unlike `@group`, this tag carries no value of its own — its mere
+ * presence is the signal, matching how `@deprecated` is used bare in both
+ * conventions. */
+export function extractDeprecated(call: CallExpression): boolean {
+  const cleaned = getCleanedLeadingComment(call);
+  if (!cleaned) return false;
+  return cleaned.split("\n").some((line) => /^@deprecated\b/i.test(line.trim()));
 }
 
 /**
@@ -941,6 +962,7 @@ export async function scanProject(rootDir: string, config: VayoConfig): Promise<
       const explicitGroup = registration ? extractExplicitGroup(registration.call) : null;
       const group = explicitGroup ?? inferGroup(endpoint.path, registration?.call.getSourceFile().getFilePath() ?? entryAbsPath);
       const groupSource: "declared" | "inferred" = explicitGroup ? "declared" : "inferred";
+      const deprecated = registration ? extractDeprecated(registration.call) : false;
       const zodRequestSchema = registration ? findRequestSchemaForRoute(registration.call, validationPatterns) : null;
       const mongooseRequestSchema = registration && !zodRequestSchema ? findMongooseRequestSchemaForRoute(registration.call) : null;
       const requestSchema = zodRequestSchema ?? mongooseRequestSchema;
@@ -954,6 +976,7 @@ export async function scanProject(rootDir: string, config: VayoConfig): Promise<
         group,
         groupSource,
         summary,
+        deprecated,
         requestSchema,
         requestSchemaSource,
       });

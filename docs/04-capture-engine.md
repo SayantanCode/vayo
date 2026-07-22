@@ -116,11 +116,18 @@ user's source tree:
    (`@vayo/db-mongo`) turns a "/"-separated `group` into real nested sidebar
    folders, creating (or reusing) one folder per segment; a flat,
    single-segment group still resolves to exactly the one top-level folder
-   it always did. The UI treats a "declared" grouping as authoritative:
+   it always did. A "declared" grouping is treated as authoritative:
    such an endpoint can be reordered among its current folder's own
-   siblings via drag-and-drop, but the sidebar refuses to relocate it to a
-   different folder, since that would silently diverge from what the code
-   itself says — see `FolderTree.tsx`'s `isBlockedGroupMove`. This is a
+   siblings via drag-and-drop, but a move to a different folder is refused
+   — both in the sidebar (`FolderTree.tsx`'s `isBlockedGroupMove`) AND, more
+   importantly, server-side in `PATCH /api/endpoints/:vayoId/placement`
+   (`packages/server/src/routes/endpoints.ts`), since a client-side-only
+   guard is not a real guarantee (a direct API call would otherwise bypass
+   it entirely — the same "never trust what the UI already hid" posture as
+   every other rule in that file). The lock only ever applies once a
+   placement already exists: a brand new "declared" endpoint
+   `autoOrganizeFolders` hasn't placed anywhere yet has nothing to diverge
+   from, so its very first placement always goes through. This is a
    deliberate, narrow exception to the "manual override always wins"
    philosophy every other field in this app follows; it applies only to
    folder placement, and only when the group came from an explicit tag —
@@ -177,6 +184,29 @@ ones (`businessOwner`, `isImported`, ...) the request never sent. The UI
 surfaces this directly (DetailsTab's "Inferred, unconfirmed" badge on the
 Request Body section) rather than presenting a guess with the same
 confidence as an enforced validator or literally-observed traffic.
+
+## Step 2 #4a — Explicit `@deprecated` tag (endpoint-level, not version-level)
+
+A bare `@deprecated` tag in the same leading comment `@group`/summary read
+sets `EndpointDoc.deprecated: true` (OpenAPI's own standard Operation
+Object field, not an `x-vayo-*` extension) and `deprecatedSource:
+"declared"` — independent of the whole API *version*'s own lifecycle
+(`ApiVersionDoc.status`, `07-api-versioning.md`): a single route can be
+deprecated while the version it belongs to is still fully active. Unlike
+`group`, there's no inferred/guessed "probably deprecated" signal — the
+tag's mere presence is the whole signal, so `deprecated` is simply `false`
+and `deprecatedSource` is `null` whenever it's absent.
+
+A human can still flag ANY endpoint deprecated through the UI even when
+the code hasn't said so (a normal override on `${vayoId}.deprecated`,
+freely reversible like any other field) — but once `deprecatedSource` is
+`"declared"`, the UI can't un-deprecate it, enforced in `PATCH
+/api/endpoints/:vayoId/deprecated` server-side (not just a hidden toggle),
+the same narrow, deliberate exception to "manual override always wins"
+that `groupSource: "declared"` already carves out for folder placement,
+above. Re-declaring an already-`true` value (whether code-declared or
+human-set) is treated as a no-op, not an error, since it isn't actually
+contradicting anything.
 
 ## Step 3 — Merge precedence (static vs. runtime vs. override)
 

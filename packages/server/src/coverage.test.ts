@@ -13,6 +13,8 @@ function endpoint(overrides: Partial<ResolvedEndpoint> = {}): ResolvedEndpoint {
     version: "v1",
     group: "Things",
     groupSource: "inferred",
+    deprecated: false,
+    deprecatedSource: null,
     summary: "A summary",
     notes: "Some frontend-workflow notes",
     authRequired: false,

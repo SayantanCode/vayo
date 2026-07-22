@@ -301,6 +301,14 @@ export const api = {
   deleteEndpoint: (config: ApiConfig, vayoId: string) =>
     request<void>(config, `/api/endpoints/${encodeURIComponent(vayoId)}`, { method: "DELETE" }),
 
+  /** Rejects `deprecated: false` for an endpoint whose group is declared
+   * deprecated in code via `@deprecated` — see the PATCH route's own comment. */
+  setDeprecated: (config: ApiConfig, vayoId: string, deprecated: boolean, reason?: string | null) =>
+    request<void>(config, `/api/endpoints/${encodeURIComponent(vayoId)}/deprecated`, {
+      method: "PATCH",
+      body: JSON.stringify({ deprecated, reason: reason ?? null }),
+    }),
+
   // ---- environments ----
   listEnvironments: (config: ApiConfig) => request<EnvironmentDoc[]>(config, "/api/environments"),
 

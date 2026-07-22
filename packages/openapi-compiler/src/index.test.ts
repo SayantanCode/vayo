@@ -3,6 +3,7 @@ import type { ResolvedEndpoint } from "@vayo/types";
 import {
   X_VAYO_AUTH_REQUIRED,
   X_VAYO_AUTH_TYPE,
+  X_VAYO_DEPRECATED_SOURCE,
   X_VAYO_FOLDER_ID,
   X_VAYO_GROUP,
   X_VAYO_GROUP_SOURCE,
@@ -25,6 +26,8 @@ function endpoint(overrides: Partial<ResolvedEndpoint> = {}): ResolvedEndpoint {
     version: "v1",
     group: "Users",
     groupSource: "inferred",
+    deprecated: false,
+    deprecatedSource: null,
     summary: null,
     notes: null,
     authRequired: false,
@@ -248,6 +251,27 @@ describe("compile", () => {
     const doc = await compile([endpoint({ possiblyRemovedSince: null })], "v1");
     const op = (doc.paths["/api/v1/users/{id}"] as Record<string, any>).get;
     expect(X_VAYO_POSSIBLY_REMOVED_SINCE in op).toBe(false);
+  });
+
+  it("emits OpenAPI's own standard deprecated:true field plus x-vayo-deprecated-source when code-declared", async () => {
+    const doc = await compile([endpoint({ deprecated: true, deprecatedSource: "declared" })], "v1");
+    const op = (doc.paths["/api/v1/users/{id}"] as Record<string, any>).get;
+    expect(op.deprecated).toBe(true);
+    expect(op[X_VAYO_DEPRECATED_SOURCE]).toBe("declared");
+  });
+
+  it("emits deprecated:true without x-vayo-deprecated-source when a human set it, not the code", async () => {
+    const doc = await compile([endpoint({ deprecated: true, deprecatedSource: null })], "v1");
+    const op = (doc.paths["/api/v1/users/{id}"] as Record<string, any>).get;
+    expect(op.deprecated).toBe(true);
+    expect(X_VAYO_DEPRECATED_SOURCE in op).toBe(false);
+  });
+
+  it("omits deprecated entirely when false, matching OpenAPI's own documented default", async () => {
+    const doc = await compile([endpoint({ deprecated: false, deprecatedSource: null })], "v1");
+    const op = (doc.paths["/api/v1/users/{id}"] as Record<string, any>).get;
+    expect("deprecated" in op).toBe(false);
+    expect(X_VAYO_DEPRECATED_SOURCE in op).toBe(false);
   });
 
   it("emits query parameters alongside path parameters, both in one parameters array", async () => {

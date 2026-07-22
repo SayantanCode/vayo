@@ -60,6 +60,16 @@ export const X_VAYO_POSSIBLY_REMOVED_SINCE = "x-vayo-possibly-removed-since";
 // authoritative: such an endpoint can be reordered within its current
 // sidebar folder via drag-and-drop, but not relocated to a different one.
 export const X_VAYO_GROUP_SOURCE = "x-vayo-group-source";
+// "declared" (EndpointDoc.deprecatedSource verbatim), present only when set
+// — an explicit `@deprecated` tag in code produced `deprecated: true`
+// (docs/04-capture-engine.md Step 2 #4a). Unlike X_VAYO_GROUP_SOURCE, this
+// one omits the "inferred" case entirely rather than emitting it: there's
+// no guessed-deprecation signal to distinguish from a human's own override,
+// so its mere presence (vs. absence) is the whole signal, same pattern as
+// X_VAYO_POSSIBLY_REMOVED_SINCE. Lets the UI refuse to un-deprecate an
+// endpoint the code itself marks deprecated, while a NOT-code-declared one
+// (this key absent) stays freely toggleable.
+export const X_VAYO_DEPRECATED_SOURCE = "x-vayo-deprecated-source";
 
 export interface OpenAPIDocument {
   openapi: "3.1.0";
@@ -209,6 +219,14 @@ function buildOperation(
   if (endpoint.summary) operation.summary = endpoint.summary;
   if (endpoint.notes) operation[X_VAYO_NOTES] = endpoint.notes;
   if (endpoint.possiblyRemovedSince) operation[X_VAYO_POSSIBLY_REMOVED_SINCE] = endpoint.possiblyRemovedSince;
+  // `deprecated` is OpenAPI's own standard Operation Object field, not an
+  // x-vayo-* extension — omitted entirely when false (its documented
+  // default), matching how every other optional field here is only added
+  // when it has something to say.
+  if (endpoint.deprecated) {
+    operation.deprecated = true;
+    if (endpoint.deprecatedSource === "declared") operation[X_VAYO_DEPRECATED_SOURCE] = endpoint.deprecatedSource;
+  }
 
   // folderId/order arrive as ad-hoc properties set by the
   // "${vayoId}.folderId"/"${vayoId}.order" overrides — not part of

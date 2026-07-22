@@ -54,6 +54,16 @@ export interface OpenApiOperation {
    * "manual", this is the other condition under which the delete route
    * allows removing an endpoint through the docs. */
   "x-vayo-possibly-removed-since"?: string | null;
+  /** OpenAPI's own standard field, not an x-vayo-* extension — present
+   * (and always `true`) only when this endpoint is deprecated; omitted
+   * entirely otherwise, matching how the compiler emits it. */
+  deprecated?: true;
+  /** "declared", present only alongside `deprecated: true`, only when an
+   * explicit `@deprecated` tag in code produced it (docs/04-capture-engine.md
+   * Step 2 #4a) — the UI refuses to un-deprecate such an endpoint, while one
+   * a human flagged deprecated via the UI (this key absent) stays freely
+   * toggleable. */
+  "x-vayo-deprecated-source"?: "declared";
 }
 
 export interface OpenApiDoc {

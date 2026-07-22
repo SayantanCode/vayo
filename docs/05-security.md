@@ -190,6 +190,30 @@ document — a still-confirmed captured endpoint's Delete action isn't
 rendered in the UI at all, but that's the courtesy layer, not the
 enforcement. Writes an `endpoint_deleted` audit entry (`03-data-model.md`).
 
+## 4c. Code-declared fields a human can't silently override
+
+Two fields carve out a narrow, deliberate exception to this app's usual
+"manual override always wins" rule — everywhere else, a human's edit
+always beats whatever the code or runtime capture says. In both cases
+below, the code is treated as the more authoritative source instead, and
+the restriction is enforced server-side, not just by hiding the control in
+the UI (same posture as every rule in this document):
+
+- `PATCH /api/endpoints/:vayoId/placement` (editor) refuses to move an
+  endpoint whose `groupSource` is `"declared"` (an explicit `@group` tag,
+  `04-capture-engine.md` Step 2 #4) to a folder other than its current
+  one — same-folder reordering still goes through. Only applies once a
+  placement override already exists; a brand new "declared" endpoint with
+  no placement yet has nothing to diverge from, so its first placement is
+  never blocked.
+- `PATCH /api/endpoints/:vayoId/deprecated` (editor) refuses to set
+  `deprecated: false` for an endpoint whose `deprecatedSource` is
+  `"declared"` (an explicit `@deprecated` tag, Step 2 #4a). A human can
+  still freely flag any NOT-code-declared endpoint deprecated (or not).
+
+Both routes 404 for an unknown `vayoId` and require `editor` role, same as
+every other mutating endpoint route.
+
 ## 5. Docs-viewer authentication
 
 Two supported modes, both documented in `08-packages-and-repo-structure.md` for

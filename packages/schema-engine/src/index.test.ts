@@ -279,6 +279,19 @@ describe("requestSchemaSource — confidence tier tracking", () => {
     const afterTraffic = mergeCapturedSample(withFlag, sample({ capturedAt: "2026-07-11T00:00:00.000Z" }));
     expect(afterTraffic.possiblyRemovedSince).toBeNull();
   });
+
+  it("has no deprecation signal of its own — a fresh runtime-only doc defaults to not deprecated", () => {
+    const doc = mergeCapturedSample(null, sample());
+    expect(doc.deprecated).toBe(false);
+    expect(doc.deprecatedSource).toBeNull();
+  });
+
+  it("preserves an existing 'declared' deprecation across further runtime samples", () => {
+    const declared = mergeStaticResult(null, staticRoute({ deprecated: true }), "v1");
+    const afterTraffic = mergeCapturedSample(declared, sample({ capturedAt: "2026-07-11T00:00:00.000Z" }));
+    expect(afterTraffic.deprecated).toBe(true);
+    expect(afterTraffic.deprecatedSource).toBe("declared");
+  });
 });
 
 describe("mergeStaticResult", () => {
@@ -360,6 +373,27 @@ describe("mergeStaticResult", () => {
     expect(rescanned.possiblyRemovedSince).toBeNull();
   });
 
+  it("sets deprecated=true and deprecatedSource='declared' when the scan found an @deprecated tag", () => {
+    const doc = mergeStaticResult(null, staticRoute({ deprecated: true }), "v1");
+    expect(doc.deprecated).toBe(true);
+    expect(doc.deprecatedSource).toBe("declared");
+  });
+
+  it("defaults deprecated=false and deprecatedSource=null when there's no @deprecated tag", () => {
+    const doc = mergeStaticResult(null, staticRoute(), "v1");
+    expect(doc.deprecated).toBe(false);
+    expect(doc.deprecatedSource).toBeNull();
+  });
+
+  it("clears deprecatedSource back to null (and deprecated back to false) once a later scan's route no longer carries the @deprecated tag", () => {
+    const declared = mergeStaticResult(null, staticRoute({ deprecated: true }), "v1");
+    expect(declared.deprecatedSource).toBe("declared");
+
+    const rescanned = mergeStaticResult(declared, staticRoute({ deprecated: false }), "v1");
+    expect(rescanned.deprecated).toBe(false);
+    expect(rescanned.deprecatedSource).toBeNull();
+  });
+
   it("promotes a 'manual' placeholder to 'merged' once real runtime traffic arrives", () => {
     const manualDoc: EndpointDoc = {
       _id: "1",
@@ -370,6 +404,8 @@ describe("mergeStaticResult", () => {
       group: "Users",
       groupSource: "inferred",
       summary: "Planned: fetch a single user",
+      deprecated: false,
+      deprecatedSource: null,
       notes: null,
       authRequired: false,
       authType: null,
