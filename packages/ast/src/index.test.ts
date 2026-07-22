@@ -137,9 +137,10 @@ describe("inferGroup", () => {
 });
 
 describe("extractExplicitGroup", () => {
-  it("reads an explicit @group tag from the leading comment", () => {
+  it("reads an explicit @group tag when the comment carries the @vayo sentinel", () => {
     const call = firstRouteRegistration(`
       /**
+       * @vayo
        * @group Orders
        */
       router.get("/orders/:id", (req, res) => res.json({}));
@@ -150,6 +151,7 @@ describe("extractExplicitGroup", () => {
   it("supports a nested @group path with the same '/'-separator inferGroup uses", () => {
     const call = firstRouteRegistration(`
       /**
+       * @vayo
        * @group Admin/Users
        */
       router.get("/admin/users/:id", (req, res) => res.json({}));
@@ -160,6 +162,7 @@ describe("extractExplicitGroup", () => {
   it("trims a trailing '- description' suffix some swagger-jsdoc tools also allow", () => {
     const call = firstRouteRegistration(`
       /**
+       * @vayo
        * @group Orders - order management
        */
       router.get("/orders/:id", (req, res) => res.json({}));
@@ -170,6 +173,7 @@ describe("extractExplicitGroup", () => {
   it("returns null when there's no @group tag at all", () => {
     const call = firstRouteRegistration(`
       /**
+       * @vayo
        * Fetch a single order by ID.
        */
       router.get("/orders/:id", (req, res) => res.json({}));
@@ -181,13 +185,24 @@ describe("extractExplicitGroup", () => {
     const call = firstRouteRegistration(`router.get("/orders/:id", (req, res) => res.json({}));`);
     expect(extractExplicitGroup(call)).toBeNull();
   });
+
+  it("ignores an @group-looking line when the comment has no @vayo sentinel — an unrelated comment must never be misread as a declaration", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * Routes moved out of the old @group of helper utilities below.
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractExplicitGroup(call)).toBeNull();
+  });
 });
 
 describe("extractSummary", () => {
-  it("strips the @group tag line out of the shown summary, keeping the description", () => {
+  it("strips the @group tag line and the @vayo sentinel out of the shown summary, keeping the description", () => {
     const call = firstRouteRegistration(`
       /**
        * Fetch a single order by ID.
+       * @vayo
        * @group Orders
        */
       router.get("/orders/:id", (req, res) => res.json({}));
@@ -195,7 +210,7 @@ describe("extractSummary", () => {
     expect(extractSummary(call)).toBe("Fetch a single order by ID.");
   });
 
-  it("leaves a plain description with no @group tag untouched", () => {
+  it("leaves a plain description with no tags untouched", () => {
     const call = firstRouteRegistration(`
       /**
        * Fetch a single order by ID.
@@ -209,6 +224,7 @@ describe("extractSummary", () => {
     const call = firstRouteRegistration(`
       /**
        * Fetch a single order by ID.
+       * @vayo
        * @deprecated
        */
       router.get("/orders/:id", (req, res) => res.json({}));
@@ -216,10 +232,11 @@ describe("extractSummary", () => {
     expect(extractSummary(call)).toBe("Fetch a single order by ID.");
   });
 
-  it("strips both @group and @deprecated tag lines, keeping only the description", () => {
+  it("strips @vayo, @group, and @deprecated tag lines, keeping only the description", () => {
     const call = firstRouteRegistration(`
       /**
        * Fetch a single order by ID.
+       * @vayo
        * @group Orders
        * @deprecated
        */
@@ -227,12 +244,21 @@ describe("extractSummary", () => {
     `);
     expect(extractSummary(call)).toBe("Fetch a single order by ID.");
   });
+
+  it("does not require @vayo at all — a plain, untagged comment still becomes the summary (zero-annotation M1 behavior)", () => {
+    const call = firstRouteRegistration(`
+      // Just an ordinary implementation note, not written for API docs.
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractSummary(call)).toBe("Just an ordinary implementation note, not written for API docs.");
+  });
 });
 
 describe("extractDeprecated", () => {
-  it("returns true for a bare @deprecated tag", () => {
+  it("returns true for a bare @deprecated tag when the comment carries the @vayo sentinel", () => {
     const call = firstRouteRegistration(`
       /**
+       * @vayo
        * @deprecated
        */
       router.get("/orders/:id", (req, res) => res.json({}));
@@ -244,6 +270,7 @@ describe("extractDeprecated", () => {
     const call = firstRouteRegistration(`
       /**
        * Fetch a single order by ID.
+       * @vayo
        * @group Orders
        * @deprecated
        */
@@ -255,6 +282,7 @@ describe("extractDeprecated", () => {
   it("returns false when there's no @deprecated tag", () => {
     const call = firstRouteRegistration(`
       /**
+       * @vayo
        * Fetch a single order by ID.
        */
       router.get("/orders/:id", (req, res) => res.json({}));
@@ -264,6 +292,28 @@ describe("extractDeprecated", () => {
 
   it("returns false when there's no leading comment at all", () => {
     const call = firstRouteRegistration(`router.get("/orders/:id", (req, res) => res.json({}));`);
+    expect(extractDeprecated(call)).toBe(false);
+  });
+
+  it("ignores an @deprecated-looking line when the comment has no @vayo sentinel", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * The @deprecated flag was removed from the old validator; see PR #123.
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDeprecated(call)).toBe(false);
+  });
+
+  it("does not flip on for a stray '@deprecated ...' sentence even inside a @vayo-tagged block, since the whole line must be exactly the tag", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @vayo
+       * @group Orders
+       * TODO: the @deprecated tag needs cleanup once the new gateway ships.
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
     expect(extractDeprecated(call)).toBe(false);
   });
 });

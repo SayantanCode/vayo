@@ -109,23 +109,34 @@ nested path (`"Admin/Users"`) — the latter comes from either a nested
 `routes/<a>/<b>/*.ts` file layout or a nested `@group Admin/Users` tag, and
 `autoOrganizeFolders` (`@vayo/db-mongo`) turns each segment into one level
 of real nested sidebar folders. `groupSource` is `"declared"` only when an
-explicit `@group <name>` tag (swagger-jsdoc's own convention) produced
-`group`; every other source — the `routes/` file convention, the
-first-URL-segment fallback, or a manually-created endpoint's free-text
-group field — is `"inferred"`. The UI treats `"declared"` as authoritative
-for folder *placement* specifically: such an endpoint can still be
-reordered among its current folder's own siblings via drag-and-drop, but
-a move to a different folder is refused — both in the sidebar and,
-server-side, in `PATCH /api/endpoints/:vayoId/placement`, since that
-would silently diverge from what the code itself says and a UI-only guard
-isn't a real guarantee. The lock only applies once a placement override
-already exists — a brand new "declared" endpoint that hasn't been placed
-anywhere yet has nothing to diverge from, so its first placement is never
-blocked. This is one of two deliberate exceptions to this app's usual
-"manual override always wins" rule (the other is `deprecatedSource`,
-below) — every other field (summary, notes, scopes, `authType`, etc.)
-still lets a human's edit win outright over whatever the code or runtime
-capture says.
+explicit `@group <name>` tag (swagger-jsdoc's own convention, and only
+recognized inside a comment also carrying the `@vayo` sentinel line —
+`04-capture-engine.md` "Disambiguating a doc comment from an ordinary
+one") produced `group`; every other source — the `routes/` file
+convention, the first-URL-segment fallback, or a manually-created
+endpoint's free-text group field — is `"inferred"`. The UI treats
+`"declared"` as authoritative for folder *placement* specifically: such an
+endpoint can still be reordered among its current folder's own siblings
+via drag-and-drop, but a move to a different folder is refused — enforced
+once, in `checkOverrideAllowed`, and applied at every write path capable
+of setting `folderId` (the dedicated `/placement` route, the generic
+`/api/overrides` route, and the Socket.IO `override:updated` event), not
+just the sidebar UI, since that would silently diverge from what the code
+itself says and a check on only one write path isn't a real guarantee.
+The lock only applies once a placement override already exists — a brand
+new "declared" endpoint that hasn't been placed anywhere yet has nothing
+to diverge from, so its first placement is never blocked. If the tag's
+*value* later changes (e.g. renamed from `@group Admin/Users` to `@group
+Admin/Customers`), the lock would otherwise leave the endpoint stuck in
+its old folder forever with no way for a human to ever move it —
+`autoOrganizeFolders` is the one place this is allowed to self-heal: it
+re-places a "declared" endpoint whenever its current folder no longer
+matches its current `group`, leaving `order` (and everything else)
+untouched when the folder already matches. This is one of two deliberate
+exceptions to this app's usual "manual override always wins" rule (the
+other is `deprecatedSource`, below) — every other field (summary, notes,
+scopes, `authType`, etc.) still lets a human's edit win outright over
+whatever the code or runtime capture says.
 
 **`deprecated`/`deprecatedSource` — the second such exception**
 (`04-capture-engine.md` Step 2 #4a). `deprecated` is OpenAPI's own
@@ -133,13 +144,27 @@ standard Operation Object field (not `x-vayo-*`) — independent of the
 whole API *version*'s own lifecycle (`ApiVersionDoc.status`,
 `07-api-versioning.md`): one route can be deprecated while its version is
 still fully active. `deprecatedSource` is `"declared"` only when an
-explicit bare `@deprecated` tag in code produced `deprecated: true`;
-`null` otherwise, including when a human (not the code) set `deprecated`
-true via the normal override mechanism. A human can freely flag any
-NOT-code-declared endpoint deprecated (or not) through the UI, but once
-`deprecatedSource` is `"declared"`, the UI can't un-deprecate it — checked
-server-side in `PATCH /api/endpoints/:vayoId/deprecated`, not just hidden
-in the UI.
+explicit bare `@deprecated` tag (also gated by the same `@vayo` sentinel)
+in code produced `deprecated: true`; `null` otherwise, including when a
+human (not the code) set `deprecated` true via the normal override
+mechanism. A human can freely flag any NOT-code-declared endpoint
+deprecated (or not) through the UI, but once `deprecatedSource` is
+`"declared"`, nothing can un-deprecate it — the same `checkOverrideAllowed`
+check, applied at the same three write paths as the folder-placement lock
+above, not just a hidden UI toggle.
+
+**`tags` (OpenAPI standard) vs. `x-vayo-group`** — `@vayo/openapi-compiler`
+also emits `group` as a real, standard OpenAPI `tags: [group]` array on
+each operation (the full "/"-separated path as one tag string, not one
+tag per segment — a flat-tag renderer has no concept of nesting, and two
+different "Users" groups under different parents would otherwise collide
+into one), plus a top-level `tags: [{name}, ...]` declaration listing
+every distinct group in first-appearance order. Without this, grouping
+would only ever work inside Vayo's own UI (which reads `x-vayo-group`
+directly) — opening the exported spec in an actual third-party Swagger UI,
+Postman import, or Redoc would show every operation in one flat,
+ungrouped list. Purely an output-side addition — no new stored field,
+`vayo_folders`/`EndpointDoc.group` stay the only source of truth.
 
 **`possiblyRemovedSince` flags a static/merged endpoint a `vayo scan` run no
 longer found** (`04-capture-engine.md` §3d), so a genuinely-removed route's
@@ -587,12 +612,23 @@ flat, single-segment `group` still resolves to exactly the one top-level
 folder it always did. It places every endpoint that has *never been placed
 anywhere* (no `folderId` override of any kind — including one explicitly
 set to root by a human, which is itself a placement) into its group's
-(deepest/leaf) folder. Additive only: re-running it after a human has
-since reorganized things only picks up whatever's still unplaced, the same
-non-destructive philosophy as overrides. `vayo scan` (`@vayo/cli`) runs it
-automatically once per version touched; `POST /api/folders/auto-organize`
-exposes the same behavior for teams that add manual endpoints straight
-from the UI.
+(deepest/leaf) folder. Additive only for an `"inferred"` group: re-running
+it after a human has since reorganized things only picks up whatever's
+still unplaced, the same non-destructive philosophy as overrides.
+
+The one exception is a **`"declared"`** group (`groupSource`, above) — a
+human is never allowed to move that endpoint's folder in the first place,
+so if its already-placed folder no longer matches its *current* `group`
+value (the `@group` tag changed since it was last placed), this is the one
+place it's allowed to self-heal: re-placed into the new matching folder
+(creating it if needed), with a freshly-appended `order`. Left completely
+untouched — including `order` — when the current folder already matches,
+so a human's own same-folder reordering of a "declared" endpoint always
+survives a rescan.
+
+`vayo scan` (`@vayo/cli`) runs this automatically once per version
+touched; `POST /api/folders/auto-organize` exposes the same behavior for
+teams that add manual endpoints straight from the UI.
 
 ## Environments & variables
 

@@ -8,7 +8,7 @@ import type { Server as SocketIOServer } from "socket.io";
 import type { TeamRole } from "@vayo/types";
 import { resolveAuth, ROLE_RANK, type AuthResult } from "./auth-middleware.js";
 import { addComment } from "./routes/comments.js";
-import { applyOverride } from "./routes/overrides.js";
+import { applyOverride, checkOverrideAllowed } from "./routes/overrides.js";
 import type { RouteDeps } from "./server-deps.js";
 
 export function attachRealtimeGateway(io: SocketIOServer, { db, sessionSecret, authMiddleware }: RouteDeps): void {
@@ -137,6 +137,16 @@ export function attachRealtimeGateway(io: SocketIOServer, { db, sessionSecret, a
       // (docs/05-security.md §6, docs/09-roadmap.md M4 done-when).
       if (ROLE_RANK[role] < ROLE_RANK.editor) {
         socket.emit("vayo:error", { event: "override:updated", error: "forbidden" });
+        return;
+      }
+      // Same two "declared in code" locks the REST routes enforce
+      // (docs/04-capture-engine.md Step 2 #4/#4a) — this event accepts an
+      // arbitrary caller-supplied fieldPath, so without this check it would
+      // be a trivial way to bypass both locks entirely over the socket
+      // transport instead of REST.
+      const blockedReason = await checkOverrideAllowed(db, `${vayoId}.${fieldPath}`, value);
+      if (blockedReason) {
+        socket.emit("vayo:error", { event: "override:updated", error: blockedReason });
         return;
       }
       const saved = await applyOverride(db, memberId, `${vayoId}.${fieldPath}`, value, null);

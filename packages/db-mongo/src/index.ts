@@ -793,29 +793,53 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
         return folderId;
       }
 
-      for (const endpoint of resolved) {
-        // Never touch an endpoint that has a placement of any kind already
-        // — including one explicitly set to root (null) by a human, which
-        // is itself a deliberate placement, not "unplaced".
-        const placement = endpoint as unknown as { folderId?: string | null };
-        if (placement.folderId !== undefined) continue;
-
-        const segments = endpoint.group.split("/").filter((s) => s.length > 0);
-        if (segments.length === 0) continue; // group is never actually empty, but guards resolveFolderPath's contract
-        const folderId = await resolveFolderPath(segments);
-
+      // Writes a fresh placement (folderId + a newly-appended order) for
+      // an endpoint, shared by both the first-placement path and the
+      // "declared" re-sync path below.
+      async function placeEndpoint(vayoId: string, folderId: string): Promise<void> {
         const order = nextOrderByFolderId.get(folderId) ?? 0;
         await db.collection(COLLECTIONS.overrides).findOneAndUpdate(
-          { targetId: `${endpoint.vayoId}.folderId` },
-          { $set: { targetId: `${endpoint.vayoId}.folderId`, value: folderId, updatedBy: actorId, updatedAt: now, reason: null } },
+          { targetId: `${vayoId}.folderId` },
+          { $set: { targetId: `${vayoId}.folderId`, value: folderId, updatedBy: actorId, updatedAt: now, reason: null } },
           { upsert: true },
         );
         await db.collection(COLLECTIONS.overrides).findOneAndUpdate(
-          { targetId: `${endpoint.vayoId}.order` },
-          { $set: { targetId: `${endpoint.vayoId}.order`, value: order, updatedBy: actorId, updatedAt: now, reason: null } },
+          { targetId: `${vayoId}.order` },
+          { $set: { targetId: `${vayoId}.order`, value: order, updatedBy: actorId, updatedAt: now, reason: null } },
           { upsert: true },
         );
         nextOrderByFolderId.set(folderId, order + 1);
+      }
+
+      for (const endpoint of resolved) {
+        const placement = endpoint as unknown as { folderId?: string | null };
+        const segments = endpoint.group.split("/").filter((s) => s.length > 0);
+        if (segments.length === 0) continue; // group is never actually empty, but guards resolveFolderPath's contract
+
+        if (placement.folderId !== undefined) {
+          // Already placed somewhere — normally hands-off entirely
+          // (additive-only, preserves a human's own reorganization). But a
+          // "declared" group (an explicit @group tag) is the one field a
+          // human was never allowed to move away from in the sidebar in
+          // the first place (docs/04-capture-engine.md Step 2 #4) — so if
+          // the tag's VALUE changed since this endpoint was last placed
+          // (e.g. `@group Admin/Users` renamed to `@group Admin/Customers`),
+          // there would otherwise be no way for it to ever follow that
+          // change: the placement lock actively refuses any human-driven
+          // move away from its current folder. Self-heal it here instead,
+          // the one place a "declared" endpoint's placement is allowed to
+          // change on its own. Left alone (including its `order`) when the
+          // current folder already matches the current group.
+          if (endpoint.groupSource !== "declared") continue;
+          const targetFolderId = await resolveFolderPath(segments);
+          if (placement.folderId === targetFolderId) continue;
+          await placeEndpoint(endpoint.vayoId, targetFolderId);
+          endpointsPlaced++;
+          continue;
+        }
+
+        const folderId = await resolveFolderPath(segments);
+        await placeEndpoint(endpoint.vayoId, folderId);
         endpointsPlaced++;
       }
 

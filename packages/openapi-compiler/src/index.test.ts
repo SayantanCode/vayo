@@ -138,6 +138,35 @@ describe("compile", () => {
     expect(op[X_VAYO_AUTH_TYPE]).toBeNull();
   });
 
+  it("emits OpenAPI's own standard 'tags' array on every operation, not just x-vayo-group — required for a third-party renderer (real Swagger UI, Postman, Redoc) to group operations at all", async () => {
+    const doc = await compile([endpoint({ group: "Orders" })], "v1");
+    const op = (doc.paths["/api/v1/users/{id}"] as Record<string, any>).get;
+    expect(op.tags).toEqual(["Orders"]);
+  });
+
+  it("emits a nested group as one single tag string, not split per segment — avoids two different 'Users' groups colliding in a flat-tag renderer", async () => {
+    const doc = await compile([endpoint({ group: "Admin/Users" })], "v1");
+    const op = (doc.paths["/api/v1/users/{id}"] as Record<string, any>).get;
+    expect(op.tags).toEqual(["Admin/Users"]);
+  });
+
+  it("declares each distinct group once in the document's top-level tags list, in first-appearance order", async () => {
+    const doc = await compile(
+      [
+        endpoint({ vayoId: "ep_1", method: "GET", pathTemplate: "/api/v1/orders", group: "Orders" }),
+        endpoint({ vayoId: "ep_2", method: "GET", pathTemplate: "/api/v1/users", group: "Users" }),
+        endpoint({ vayoId: "ep_3", method: "POST", pathTemplate: "/api/v1/orders", group: "Orders" }),
+      ],
+      "v1",
+    );
+    expect(doc.tags).toEqual([{ name: "Orders" }, { name: "Users" }]);
+  });
+
+  it("omits the top-level tags array entirely for a version with no endpoints", async () => {
+    const doc = await compile([], "v1");
+    expect(doc.tags).toBeUndefined();
+  });
+
   it("emits x-vayo-group-source verbatim, always present since group itself is never absent", async () => {
     const declared = await compile([endpoint({ groupSource: "declared" })], "v1");
     expect((declared.paths["/api/v1/users/{id}"] as Record<string, any>).get[X_VAYO_GROUP_SOURCE]).toBe("declared");

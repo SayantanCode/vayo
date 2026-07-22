@@ -339,6 +339,23 @@ describe("override:updated over sockets — the one event a viewer must never tr
     const stored = await db.getOverride("ep_6.summary");
     expect(stored?.value).toBe("Fetches a widget");
   });
+
+  it("refuses to un-deprecate a 'declared' endpoint over this transport too, not just the dedicated REST route", async () => {
+    const endpoint = await db.upsertStaticResult(
+      { method: "GET", pathTemplate: "/api/v1/socket-legacy", middlewareChain: [], authRequiredGuess: false, scopes: [], group: "Legacy", summary: null, deprecated: true },
+      "v1",
+    );
+    expect(endpoint.deprecatedSource).toBe("declared");
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+    const socket = await connect(token);
+
+    const errorEvent = waitFor<{ event: string; error: string }>(socket, "vayo:error");
+    socket.emit("override:updated", { vayoId: endpoint.vayoId, fieldPath: "deprecated", value: false });
+    const payload = await errorEvent;
+    expect(payload.event).toBe("override:updated");
+
+    expect(await db.getOverride(`${endpoint.vayoId}.deprecated`)).toBeNull();
+  });
 });
 
 describe("notification:new — broadcast to the global project room", () => {
