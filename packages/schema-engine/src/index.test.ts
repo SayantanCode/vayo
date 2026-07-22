@@ -368,6 +368,7 @@ describe("mergeStaticResult", () => {
       pathTemplate: "/api/v1/users/:id",
       version: "v1",
       group: "Users",
+      groupSource: "inferred",
       summary: "Planned: fetch a single user",
       notes: null,
       authRequired: false,

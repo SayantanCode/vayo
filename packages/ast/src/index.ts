@@ -51,6 +51,14 @@ export interface StaticRouteResult {
   authRequiredGuess: boolean;
   scopes: string[];
   group: string;
+  /** "declared" when an explicit `@group <name>` tag was found in the
+   * route's leading comment (swagger-jsdoc's own convention), "inferred"
+   * when `group` instead came from the `routes/` file-layout convention or
+   * the URL-segment fallback (docs/04-capture-engine.md Step 2 #4). Lets
+   * the UI treat a `"declared"` grouping as authoritative — e.g. refusing
+   * to let a drag-and-drop move it to a different sidebar folder, since
+   * that would silently diverge from what the code itself says. */
+  groupSource: "declared" | "inferred";
   summary: string | null;
   /** A Zod- or Mongoose-derived request body shape, when one could be
    * traced statically — see `findRequestSchemaForRoute`/
@@ -91,14 +99,25 @@ function unwrapApp(mod: { default?: unknown; app?: unknown }): unknown {
 }
 
 /** Folder/mount-path convention (docs/04-capture-engine.md Step 2 #4): a
- * route registered from a file under `routes/orders/*.ts` -> "Orders".
- * Falls back to the first meaningful path segment when the entry file
- * isn't organized that way (e.g. a single flat app.ts, as in the demo app). */
-function inferGroup(pathTemplate: string, sourceFilePath: string): string {
-  const folderMatch = sourceFilePath.replace(/\\/g, "/").match(/\/routes\/([^/]+)\//i);
-  const raw =
-    folderMatch?.[1] ??
-    pathTemplate.split("/").find((s) => s.length > 0 && !s.startsWith(":") && !/^v\d+$/i.test(s) && s !== "api");
+ * route registered from a file under `routes/orders/*.ts` -> "Orders", and
+ * one under `routes/admin/users/*.ts` -> "Admin/Users" — every directory
+ * segment between `routes/` and the file itself becomes one level of the
+ * "/"-separated group path, so `@vayo/db-mongo`'s `autoOrganizeFolders` can
+ * turn a nested route-file layout into real nested sidebar folders instead
+ * of flattening it to one level. Falls back to the first meaningful path
+ * segment (never nested — a URL's own segments aren't a reliable
+ * organizational signal the way a deliberate file layout is) when the entry
+ * file isn't organized that way at all (e.g. a single flat app.ts, as in
+ * the demo app). */
+export function inferGroup(pathTemplate: string, sourceFilePath: string): string {
+  const folderMatch = sourceFilePath.replace(/\\/g, "/").match(/\/routes\/(.+)\/[^/]+$/i);
+  if (folderMatch) {
+    const segments = folderMatch[1]!.split("/").filter((s) => s.length > 0);
+    if (segments.length > 0) {
+      return segments.map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join("/");
+    }
+  }
+  const raw = pathTemplate.split("/").find((s) => s.length > 0 && !s.startsWith(":") && !/^v\d+$/i.test(s) && s !== "api");
   if (!raw) return "General";
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
@@ -772,11 +791,10 @@ export function findMongooseRequestSchemaForRoute(call: CallExpression): JSONSch
   return findDirectPassthroughSchema(handlerBody) ?? findDestructuredCrossReferencedSchema(handlerBody);
 }
 
-/** JSDoc/leading-comment above a route registration statement, if any —
- * higher fidelity than nothing, never required (docs/04-capture-engine.md
- * Step 2 #6). Absent for the demo app on purpose: the M1 done-when bar
- * requires zero annotations in demo-app's own code. */
-function extractSummary(call: CallExpression): string | null {
+/** Shared by `extractSummary`/`extractExplicitGroup` below — the leading
+ * JSDoc/comment above a route registration statement, stripped of comment
+ * syntax (`/** */`, `//`, leading ` * `), or null if there isn't one. */
+function getCleanedLeadingComment(call: CallExpression): string | null {
   const statement = call.getParentIfKind(SyntaxKind.ExpressionStatement) ?? call;
   const ranges = statement.getLeadingCommentRanges();
   if (ranges.length === 0) return null;
@@ -787,6 +805,46 @@ function extractSummary(call: CallExpression): string | null {
     .replace(/^\s*\*\s?/gm, "")
     .trim();
   return cleaned.length > 0 ? cleaned : null;
+}
+
+/** JSDoc/leading-comment above a route registration statement, if any —
+ * higher fidelity than nothing, never required (docs/04-capture-engine.md
+ * Step 2 #6). Absent for the demo app on purpose: the M1 done-when bar
+ * requires zero annotations in demo-app's own code. Strips out any
+ * `@group` tag line (see `extractExplicitGroup` below) — same
+ * description-vs-structured-tags split swagger-jsdoc itself uses, so the
+ * tag doesn't show up twice (once as this summary, once as the group). */
+export function extractSummary(call: CallExpression): string | null {
+  const cleaned = getCleanedLeadingComment(call);
+  if (!cleaned) return null;
+  const withoutTags = cleaned
+    .split("\n")
+    .filter((line) => !/^@group\b/i.test(line.trim()))
+    .join("\n")
+    .trim();
+  return withoutTags.length > 0 ? withoutTags : null;
+}
+
+/** Explicit `@group <name>` tag in the same leading comment `extractSummary`
+ * reads — swagger-jsdoc's own convention (e.g. `@group Orders - order
+ * management`) for declaring a route's documentation grouping directly in
+ * code, rather than leaving it to the `routes/` file-layout convention or a
+ * guessed URL segment (docs/04-capture-engine.md Step 2 #4). A trailing
+ * `- description` some tools also allow after the name is trimmed off,
+ * since that's redundant with `extractSummary`'s own result. Nested groups
+ * follow the same "/"-separated convention `inferGroup` uses, e.g.
+ * `@group Admin/Users`. */
+export function extractExplicitGroup(call: CallExpression): string | null {
+  const cleaned = getCleanedLeadingComment(call);
+  if (!cleaned) return null;
+  for (const line of cleaned.split("\n")) {
+    const match = line.trim().match(/^@group\s+([^-]+)/i);
+    if (match) {
+      const name = match[1]!.trim();
+      return name.length > 0 ? name : null;
+    }
+  }
+  return null;
 }
 
 /**
@@ -880,7 +938,9 @@ export async function scanProject(rootDir: string, config: VayoConfig): Promise<
       );
       const scopes = registration ? extractScopes(registration.call, scopePatterns) : [];
       const summary = registration ? extractSummary(registration.call) : null;
-      const group = inferGroup(endpoint.path, registration?.call.getSourceFile().getFilePath() ?? entryAbsPath);
+      const explicitGroup = registration ? extractExplicitGroup(registration.call) : null;
+      const group = explicitGroup ?? inferGroup(endpoint.path, registration?.call.getSourceFile().getFilePath() ?? entryAbsPath);
+      const groupSource: "declared" | "inferred" = explicitGroup ? "declared" : "inferred";
       const zodRequestSchema = registration ? findRequestSchemaForRoute(registration.call, validationPatterns) : null;
       const mongooseRequestSchema = registration && !zodRequestSchema ? findMongooseRequestSchemaForRoute(registration.call) : null;
       const requestSchema = zodRequestSchema ?? mongooseRequestSchema;
@@ -892,6 +952,7 @@ export async function scanProject(rootDir: string, config: VayoConfig): Promise<
         authRequiredGuess,
         scopes,
         group,
+        groupSource,
         summary,
         requestSchema,
         requestSchemaSource,

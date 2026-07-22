@@ -104,8 +104,28 @@ user's source tree:
    request/response types are typed via Zod schemas or TS interfaces, extract a
    schema directly — this is higher-fidelity than runtime inference and should
    win when both exist (see merge precedence below).
-4. Folder/mount-path convention infers `group` (`routes/orders/*.ts` → `"Orders"`)
-   unless a `route.group` override exists.
+4. Folder/mount-path convention infers `group` (`routes/orders/*.ts` →
+   `"Orders"`, and `routes/admin/users/*.ts` → `"Admin/Users"` — every
+   directory segment between `routes/` and the file itself becomes one
+   level of the "/"-separated group path) unless a `route.group` override
+   exists. An explicit `@group <name>` tag in the route's leading comment
+   (swagger-jsdoc's own convention, e.g. `@group Orders` or a nested
+   `@group Admin/Users`) wins outright over both this convention and the
+   URL-segment fallback — `EndpointDoc.groupSource` records "declared" when
+   this tag produced `group`, "inferred" otherwise. `autoOrganizeFolders`
+   (`@vayo/db-mongo`) turns a "/"-separated `group` into real nested sidebar
+   folders, creating (or reusing) one folder per segment; a flat,
+   single-segment group still resolves to exactly the one top-level folder
+   it always did. The UI treats a "declared" grouping as authoritative:
+   such an endpoint can be reordered among its current folder's own
+   siblings via drag-and-drop, but the sidebar refuses to relocate it to a
+   different folder, since that would silently diverge from what the code
+   itself says — see `FolderTree.tsx`'s `isBlockedGroupMove`. This is a
+   deliberate, narrow exception to the "manual override always wins"
+   philosophy every other field in this app follows; it applies only to
+   folder placement, and only when the group came from an explicit tag —
+   an inferred group (file convention or URL guess) stays fully
+   drag-and-drop-able, same as before.
 
 ## Step 2 #3b — Mongoose model extraction (when there's no Zod schema to trace)
 

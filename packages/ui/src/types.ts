@@ -26,6 +26,12 @@ export interface OpenApiOperation {
   security?: Array<Record<string, string[]>>;
   "x-vayo-id": string;
   "x-vayo-group": string;
+  /** "declared" when an explicit `@group` tag in code produced
+   * `x-vayo-group`, "inferred" otherwise (docs/04-capture-engine.md Step 2
+   * #4). A "declared" endpoint can be reordered within its current sidebar
+   * folder via drag-and-drop, but the sidebar refuses to move it to a
+   * different folder — see FolderTree's handleDragEnd. */
+  "x-vayo-group-source": "declared" | "inferred";
   "x-vayo-scopes": string[];
   "x-vayo-middleware-chain": string[];
   "x-vayo-auth-required": boolean;

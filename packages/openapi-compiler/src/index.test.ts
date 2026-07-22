@@ -5,6 +5,7 @@ import {
   X_VAYO_AUTH_TYPE,
   X_VAYO_FOLDER_ID,
   X_VAYO_GROUP,
+  X_VAYO_GROUP_SOURCE,
   X_VAYO_ID,
   X_VAYO_ORDER,
   X_VAYO_POSSIBLY_REMOVED_SINCE,
@@ -23,6 +24,7 @@ function endpoint(overrides: Partial<ResolvedEndpoint> = {}): ResolvedEndpoint {
     pathTemplate: "/api/v1/users/:id",
     version: "v1",
     group: "Users",
+    groupSource: "inferred",
     summary: null,
     notes: null,
     authRequired: false,
@@ -131,6 +133,14 @@ describe("compile", () => {
     expect(op[X_VAYO_SCOPES]).toEqual(["admin:read"]);
     expect(op[X_VAYO_AUTH_REQUIRED]).toBe(true);
     expect(op[X_VAYO_AUTH_TYPE]).toBeNull();
+  });
+
+  it("emits x-vayo-group-source verbatim, always present since group itself is never absent", async () => {
+    const declared = await compile([endpoint({ groupSource: "declared" })], "v1");
+    expect((declared.paths["/api/v1/users/{id}"] as Record<string, any>).get[X_VAYO_GROUP_SOURCE]).toBe("declared");
+
+    const inferred = await compile([endpoint({ groupSource: "inferred" })], "v1");
+    expect((inferred.paths["/api/v1/users/{id}"] as Record<string, any>).get[X_VAYO_GROUP_SOURCE]).toBe("inferred");
   });
 
   it("surfaces folder placement (an override-injected ad-hoc field) as x-vayo-folder-id/order when present", async () => {

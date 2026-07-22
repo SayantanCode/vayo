@@ -660,6 +660,57 @@ describe("createAdapter — folders", () => {
     const placementForExplicit = await adapter.getOverride(`${explicitlyAtRoot.vayoId}.folderId`);
     expect(placementForExplicit?.value).toBeNull(); // left exactly as the human set it
   });
+
+  it("autoOrganizeFolders creates real nested folders for a '/'-separated group path", async () => {
+    const endpoint = await adapter.upsertStaticResult(
+      staticRoute({ pathTemplate: "/api/v1/admin/users/:id", group: "Admin/Users" }),
+      "v1",
+    );
+
+    const result = await adapter.autoOrganizeFolders("v1", "owner_1");
+    expect(result.foldersCreated).toBe(2); // "Admin" + "Users" nested inside it
+    expect(result.endpointsPlaced).toBe(1);
+
+    const placement = await adapter.getOverride(`${endpoint.vayoId}.folderId`);
+    const leafFolder = await adapter.getFolder(placement!.value as string);
+    expect(leafFolder?.name).toBe("Users");
+    expect(leafFolder?.parentId).not.toBeNull();
+
+    const parentFolder = await adapter.getFolder(leafFolder!.parentId!);
+    expect(parentFolder?.name).toBe("Admin");
+    expect(parentFolder?.parentId).toBeNull();
+  });
+
+  it("autoOrganizeFolders reuses an existing nested folder instead of duplicating it", async () => {
+    const first = await adapter.upsertStaticResult(
+      staticRoute({ pathTemplate: "/api/v1/admin/users/:id", group: "Admin/Users" }),
+      "v1",
+    );
+    await adapter.autoOrganizeFolders("v1", "owner_1");
+
+    const second = await adapter.upsertStaticResult(
+      staticRoute({ method: "POST", pathTemplate: "/api/v1/admin/users", group: "Admin/Users" }),
+      "v1",
+    );
+    const result = await adapter.autoOrganizeFolders("v1", "owner_1");
+    expect(result.foldersCreated).toBe(0); // both "Admin" and "Users" already exist
+    expect(result.endpointsPlaced).toBe(1);
+
+    const firstPlacement = await adapter.getOverride(`${first.vayoId}.folderId`);
+    const secondPlacement = await adapter.getOverride(`${second.vayoId}.folderId`);
+    expect(secondPlacement?.value).toBe(firstPlacement?.value); // same "Users" leaf folder
+  });
+
+  it("keeps a flat, single-segment group resolving to exactly one top-level folder, unaffected by nesting support", async () => {
+    const endpoint = await adapter.upsertStaticResult(staticRoute({ pathTemplate: "/api/v1/orders/:id", group: "Orders" }), "v1");
+    const result = await adapter.autoOrganizeFolders("v1", "owner_1");
+    expect(result.foldersCreated).toBe(1);
+
+    const placement = await adapter.getOverride(`${endpoint.vayoId}.folderId`);
+    const folder = await adapter.getFolder(placement!.value as string);
+    expect(folder?.name).toBe("Orders");
+    expect(folder?.parentId).toBeNull();
+  });
 });
 
 describe("createAdapter — comment flagging", () => {

@@ -218,6 +218,7 @@ export function mergeCapturedSample(
     pathTemplate: sample.pathTemplate,
     version: sample.version,
     group: existing?.group ?? inferGroupFromPath(sample.pathTemplate),
+    groupSource: existing?.groupSource ?? "inferred",
     summary: existing?.summary ?? null,
     notes: existing?.notes ?? null,
     authRequired,
@@ -262,6 +263,11 @@ export interface StaticRouteMergeInput {
   authRequiredGuess: boolean;
   scopes: string[];
   group: string;
+  /** "declared" when `@vayo/ast` found an explicit `@group` tag,
+   * "inferred" otherwise (docs/04-capture-engine.md Step 2 #4) — optional
+   * so any caller still constructing the older shape keeps compiling;
+   * defaults to "inferred" when omitted. */
+  groupSource?: "declared" | "inferred";
   summary: string | null;
   /** A Zod- or Mongoose-derived request body shape, when `@vayo/ast` could
    * trace one statically (docs/04-capture-engine.md Step 2 #3/#3b) —
@@ -312,6 +318,11 @@ export function mergeStaticResult(
     pathTemplate: route.pathTemplate,
     version,
     group: route.group,
+    // Mirrors group's own unconditional overwrite immediately above — the
+    // two must never drift apart, or a rescan whose route no longer has an
+    // explicit @group tag would leave a stale "declared" lock in place on a
+    // group value that's actually just a fresh guess.
+    groupSource: route.groupSource ?? "inferred",
     summary: route.summary ?? existing?.summary ?? null,
     notes: existing?.notes ?? null,
     authRequired,
