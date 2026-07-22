@@ -93,7 +93,7 @@ export function createFakeDb(): VayoDbAdapter {
       return doc;
     },
     // No production @vayo/server route calls this directly (only vayo
-    // scan/@vayo/cli does) — but the "declared" group/deprecated lock
+    // scan/vayo does) — but the "declared" group/deprecated lock
     // tests need a way to seed an endpoint whose groupSource/
     // deprecatedSource is actually "declared", so this delegates to the
     // real mergeStaticResult, same as upsertEndpoint delegates to

@@ -34,7 +34,7 @@ import { createAttachmentsRouter } from "./routes/attachments.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { createTeamRouter } from "./routes/team.js";
 
-// Re-exported so @vayo/cli's `vayo export --format postman` can compile a
+// Re-exported so vayo's `vayo export --format postman` can compile a
 // collection directly against the DB, without needing a running server —
 // the same reason `compile`/`diffSpecs` from @vayo/openapi-compiler are
 // already usable that way (both re-exported the same way from

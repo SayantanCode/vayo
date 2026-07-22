@@ -1,4 +1,4 @@
-// @vayo/cli — vayo export: compiles the resolved spec for a version and
+// vayo — vayo export: compiles the resolved spec for a version and
 // writes it to disk, either as OpenAPI 3.1 (docs/09-roadmap.md M2 done-when)
 // or a Postman Collection v2.1 — the same logic apps/demo-app/src/export.ts
 // and @vayo/server's /api/export/postman route already prove independently.

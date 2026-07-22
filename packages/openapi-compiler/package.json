@@ -11,7 +11,7 @@
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": ["dist", "!dist/**/*.test.js", "!dist/**/*.test.d.ts"],
   "scripts": { "build": "tsc -b", "test": "vitest run" },
   "dependencies": {
     "@vayo/types": "workspace:*",

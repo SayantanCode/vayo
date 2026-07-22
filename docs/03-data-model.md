@@ -2,7 +2,7 @@
 
 All collections live in the database the user configured via their Mongo URI.
 Vayo creates them on `vayo init` (see `08-packages-and-repo-structure.md`,
-`@vayo/cli`). Collection names are prefixed `vayo_` to avoid colliding with
+`vayo`). Collection names are prefixed `vayo_` to avoid colliding with
 the user's own collections in a shared database.
 
 ## The generic capture format (the stack-agnostic contract)
@@ -626,7 +626,7 @@ untouched — including `order` — when the current folder already matches,
 so a human's own same-folder reordering of a "declared" endpoint always
 survives a rescan.
 
-`vayo scan` (`@vayo/cli`) runs this automatically once per version
+`vayo scan` (`vayo`) runs this automatically once per version
 touched; `POST /api/folders/auto-organize` exposes the same behavior for
 teams that add manual endpoints straight from the UI.
 

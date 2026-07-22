@@ -20,7 +20,7 @@ diff` (added/removed operations, added/removed *required* fields, type
 changes, enum changes).
 
 Most people use this via
-[`vayo export`](https://www.npmjs.com/package/@vayo/cli), not directly.
+[`vayo export`](https://www.npmjs.com/package/vayo), not directly.
 
 ## License
 

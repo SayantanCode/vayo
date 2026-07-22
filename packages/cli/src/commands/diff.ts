@@ -1,4 +1,4 @@
-// @vayo/cli — vayo diff: the same compileVersion + diffSpecs logic as
+// vayo — vayo diff: the same compileVersion + diffSpecs logic as
 // @vayo/server's GET /api/diff route, run directly against the DB so CI
 // doesn't need a running server just to gate a breaking change
 // (docs/07-api-versioning.md).

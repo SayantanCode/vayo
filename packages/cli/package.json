@@ -1,5 +1,5 @@
 {
-  "name": "@vayo/cli",
+  "name": "vayo",
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
@@ -12,7 +12,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": { "vayo": "dist/index.js" },
-  "files": ["dist"],
+  "files": ["dist", "!dist/**/*.test.js", "!dist/**/*.test.d.ts"],
   "scripts": { "build": "tsc -b" },
   "dependencies": {
     "@vayo/types": "workspace:*",

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @vayo/cli — vayo init / scan / export / serve / diff.
+// vayo — vayo init / scan / export / serve / diff.
 // docs/08-packages-and-repo-structure.md.
 
 import { config as loadDotenv } from "dotenv";

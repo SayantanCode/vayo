@@ -38,7 +38,7 @@ myExpressApp.use(vayoApp);
 ```
 
 Most people run this via `vayo serve` — see
-[`@vayo/cli`](https://www.npmjs.com/package/@vayo/cli).
+[`vayo`](https://www.npmjs.com/package/vayo).
 
 ## License
 

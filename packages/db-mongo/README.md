@@ -21,7 +21,7 @@ own collections in a shared database.
 
 Most people never call this directly — it's wired up automatically by
 `vayo init`/`vayo scan`/`vayo serve` in
-[`@vayo/cli`](https://www.npmjs.com/package/@vayo/cli).
+[`vayo`](https://www.npmjs.com/package/vayo).
 
 ## License
 

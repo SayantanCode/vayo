@@ -60,7 +60,7 @@ npm install /some/tarball/dir/vayo-*.tgz express@^4.19.0
 ```
 
 Once published, this collapses to `npm install @vayo/capture-express
-@vayo/db-mongo @vayo/cli express@^4`.
+@vayo/db-mongo vayo express@^4`.
 
 ### 1. Initialize
 
