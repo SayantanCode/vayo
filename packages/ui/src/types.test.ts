@@ -18,6 +18,7 @@ function op(overrides: Partial<OpenApiOperation> = {}): OpenApiOperation {
     responses: { "200": { description: "OK" } },
     "x-vayo-id": "ep_1",
     "x-vayo-group": "Widgets",
+    "x-vayo-group-source": "inferred",
     "x-vayo-scopes": [],
     "x-vayo-middleware-chain": [],
     "x-vayo-auth-required": false,

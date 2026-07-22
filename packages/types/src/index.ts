@@ -51,6 +51,16 @@ export interface EndpointDoc {
   pathTemplate: string;
   version: string;
   group: string;
+  /** "declared" when `group` came from an explicit `@group <name>` tag in
+   * the route's leading comment (swagger-jsdoc's own convention,
+   * docs/04-capture-engine.md Step 2 #4), "inferred" when it came from the
+   * `routes/` file-layout convention, a guessed URL segment, or a manually
+   * created endpoint's free-text group field. The UI treats "declared" as
+   * authoritative: such an endpoint can still be reordered among its
+   * current folder's siblings via drag-and-drop, but not relocated to a
+   * different folder, since that would silently diverge from what the code
+   * itself says (docs/03-data-model.md "Manual endpoints & folders"). */
+  groupSource: "declared" | "inferred";
   summary: string | null;
   /** Markdown (with embedded Mermaid diagram support in the UI) explaining
    * how this endpoint fits into a larger frontend workflow — e.g. "this

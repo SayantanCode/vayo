@@ -12,6 +12,7 @@ function endpoint(overrides: Partial<ResolvedEndpoint> = {}): ResolvedEndpoint {
     pathTemplate: `/api/v1/thing-${n}`,
     version: "v1",
     group: "Things",
+    groupSource: "inferred",
     summary: "A summary",
     notes: "Some frontend-workflow notes",
     authRequired: false,

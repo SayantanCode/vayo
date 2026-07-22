@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildMountPrefixMap,
   DEFAULT_VALIDATION_MIDDLEWARE_PATTERNS,
+  extractExplicitGroup,
   extractMiddlewareNames,
+  extractSummary,
   findMongooseRequestSchemaForRoute,
   findRequestSchemaForRoute,
+  inferGroup,
   joinMountedPath,
   pathSegmentsMatch,
 } from "./index.js";
@@ -107,6 +110,98 @@ describe("extractMiddlewareNames", () => {
     const postCall = firstRouteRegistration(`router.post("/", requireAuth, (req, res) => res.status(201).send());`);
     expect(extractMiddlewareNames(getCall)).toEqual([]);
     expect(extractMiddlewareNames(postCall)).toEqual(["requireAuth"]);
+  });
+});
+
+describe("inferGroup", () => {
+  it("infers a single-level group from a routes/<name>/ file convention", () => {
+    expect(inferGroup("/api/v1/orders/:id", "/app/src/routes/orders/index.ts")).toBe("Orders");
+  });
+
+  it("infers a nested group from multiple routes/ directory levels", () => {
+    expect(inferGroup("/api/v1/admin/users/:id", "/app/src/routes/admin/users/index.ts")).toBe("Admin/Users");
+  });
+
+  it("infers a three-level nested group", () => {
+    expect(inferGroup("/api/v1/x", "/app/src/routes/api/admin/users/index.ts")).toBe("Api/Admin/Users");
+  });
+
+  it("falls back to the first meaningful URL segment when there's no routes/ convention", () => {
+    expect(inferGroup("/api/v1/widgets/:id", "/app/src/app.ts")).toBe("Widgets");
+  });
+
+  it("falls back to 'General' when nothing meaningful can be inferred", () => {
+    expect(inferGroup("/", "/app/src/app.ts")).toBe("General");
+  });
+});
+
+describe("extractExplicitGroup", () => {
+  it("reads an explicit @group tag from the leading comment", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @group Orders
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractExplicitGroup(call)).toBe("Orders");
+  });
+
+  it("supports a nested @group path with the same '/'-separator inferGroup uses", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @group Admin/Users
+       */
+      router.get("/admin/users/:id", (req, res) => res.json({}));
+    `);
+    expect(extractExplicitGroup(call)).toBe("Admin/Users");
+  });
+
+  it("trims a trailing '- description' suffix some swagger-jsdoc tools also allow", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @group Orders - order management
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractExplicitGroup(call)).toBe("Orders");
+  });
+
+  it("returns null when there's no @group tag at all", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * Fetch a single order by ID.
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractExplicitGroup(call)).toBeNull();
+  });
+
+  it("returns null when there's no leading comment at all", () => {
+    const call = firstRouteRegistration(`router.get("/orders/:id", (req, res) => res.json({}));`);
+    expect(extractExplicitGroup(call)).toBeNull();
+  });
+});
+
+describe("extractSummary", () => {
+  it("strips the @group tag line out of the shown summary, keeping the description", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * Fetch a single order by ID.
+       * @group Orders
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractSummary(call)).toBe("Fetch a single order by ID.");
+  });
+
+  it("leaves a plain description with no @group tag untouched", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * Fetch a single order by ID.
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractSummary(call)).toBe("Fetch a single order by ID.");
   });
 });
 

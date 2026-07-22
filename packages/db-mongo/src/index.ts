@@ -607,6 +607,10 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
         pathTemplate: input.pathTemplate,
         version: input.version,
         group: input.group,
+        // A human typed this group directly (not a code declaration) — kept
+        // fully flexible via drag-and-drop, same as everything else about a
+        // "manual" endpoint.
+        groupSource: "inferred",
         summary: input.summary,
         notes: null,
         authRequired: false,
@@ -716,7 +720,22 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
       const existingFolders = (await db.collection(COLLECTIONS.folders).find({ version }).sort({ order: 1 }).toArray()).map(
         (raw) => fromMongo<FolderDoc>(raw),
       );
-      const folderIdByName = new Map(existingFolders.filter((f) => f.parentId === null).map((f) => [f.name, f._id] as const));
+      // Keyed by `${parentId ?? "root"}::${name}` rather than just `name` —
+      // a group path like "Admin/Users" needs to resolve "Users" scoped
+      // under its own "Admin" parent, distinct from a top-level "Users"
+      // folder or a "Users" nested under some other parent.
+      const folderIdByParentAndName = new Map<string, string>();
+      for (const f of existingFolders) {
+        folderIdByParentAndName.set(`${f.parentId ?? "root"}::${f.name}`, f._id);
+      }
+      // Next sibling `order` per parent, seeded from existing folders at
+      // that level, so a newly auto-created folder never collides with a
+      // human's own folder ordering at the same level.
+      const nextFolderOrderByParent = new Map<string, number>();
+      for (const f of existingFolders) {
+        const key = f.parentId ?? "root";
+        nextFolderOrderByParent.set(key, Math.max(nextFolderOrderByParent.get(key) ?? 0, f.order + 1));
+      }
 
       // Seed each folder's next `order` from whatever's already placed
       // there, so a newly auto-placed endpoint never collides with a
@@ -734,6 +753,44 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
       let endpointsPlaced = 0;
       const now = new Date().toISOString();
 
+      // Resolves (creating as needed, level by level) the folder id for a
+      // "/"-separated group path — e.g. "Admin/Users" walks/creates a
+      // top-level "Admin" folder, then a "Users" sub-folder inside it,
+      // returning the deepest (leaf) folder's id. `@vayo/ast`'s
+      // `inferGroup` (docs/04-capture-engine.md Step 2 #4) is what actually
+      // produces multi-segment group paths, from a nested `routes/`
+      // directory layout; a flat, single-segment group still resolves to
+      // exactly the one top-level folder it always did.
+      async function resolveFolderPath(segments: string[]): Promise<string> {
+        let parentId: string | null = null;
+        let folderId = "";
+        for (const name of segments) {
+          const parentKey = parentId ?? "root";
+          const lookupKey = `${parentKey}::${name}`;
+          let id = folderIdByParentAndName.get(lookupKey);
+          if (!id) {
+            const order = nextFolderOrderByParent.get(parentKey) ?? 0;
+            const newFolder: Omit<FolderDoc, "_id"> = {
+              name,
+              parentId,
+              version,
+              order,
+              createdBy: actorId,
+              createdAt: now,
+              updatedAt: now,
+            };
+            const result = await db.collection(COLLECTIONS.folders).insertOne(newFolder);
+            id = result.insertedId.toString();
+            folderIdByParentAndName.set(lookupKey, id);
+            nextFolderOrderByParent.set(parentKey, order + 1);
+            foldersCreated++;
+          }
+          parentId = id;
+          folderId = id;
+        }
+        return folderId;
+      }
+
       for (const endpoint of resolved) {
         // Never touch an endpoint that has a placement of any kind already
         // — including one explicitly set to root (null) by a human, which
@@ -741,22 +798,9 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
         const placement = endpoint as unknown as { folderId?: string | null };
         if (placement.folderId !== undefined) continue;
 
-        let folderId = folderIdByName.get(endpoint.group);
-        if (!folderId) {
-          const newFolder: Omit<FolderDoc, "_id"> = {
-            name: endpoint.group,
-            parentId: null,
-            version,
-            order: folderIdByName.size,
-            createdBy: actorId,
-            createdAt: now,
-            updatedAt: now,
-          };
-          const result = await db.collection(COLLECTIONS.folders).insertOne(newFolder);
-          folderId = result.insertedId.toString();
-          folderIdByName.set(endpoint.group, folderId);
-          foldersCreated++;
-        }
+        const segments = endpoint.group.split("/").filter((s) => s.length > 0);
+        if (segments.length === 0) continue; // group is never actually empty, but guards resolveFolderPath's contract
+        const folderId = await resolveFolderPath(segments);
 
         const order = nextOrderByFolderId.get(folderId) ?? 0;
         await db.collection(COLLECTIONS.overrides).findOneAndUpdate(

@@ -46,7 +46,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
-import { ChevronDown, ChevronRight, FilePlus, Folder, FolderPlus, FoldVertical, Sparkles, UnfoldVertical } from "lucide-react";
+import { ChevronDown, ChevronRight, FilePlus, Folder, FolderPlus, FoldVertical, Sparkles, Tag, UnfoldVertical } from "lucide-react";
 import type { FolderDoc } from "@vayo/types";
 import type { FlatTreeRow, TreeNode } from "../types.js";
 import { flattenTree } from "../types.js";
@@ -81,6 +81,11 @@ interface FolderTreeProps {
   onReorderSiblings: (kind: "folder" | "endpoint", parentId: string | null, orderedIds: string[]) => void;
   onMoveToFolder: (kind: "folder" | "endpoint", id: string, targetFolderId: string | null) => void;
   onAutoOrganize: () => void;
+  /** Called instead of a move when `isBlockedGroupMove` refuses one — the
+   * host app surfaces this through its existing error banner (same channel
+   * any other failed action already uses), rather than the drag silently
+   * doing nothing with no explanation. */
+  onBlockedMove: (message: string) => void;
 }
 
 function nodeIdentity(node: TreeNode): { kind: "folder" | "endpoint"; id: string; label: string; method?: string } {
@@ -94,6 +99,27 @@ function nodeIdentity(node: TreeNode): { kind: "folder" | "endpoint"; id: string
 function isFolderOrDescendant(startId: string, targetId: string, allFolders: FolderDoc[]): boolean {
   if (startId === targetId) return true;
   return allFolders.filter((f) => f.parentId === startId).some((child) => isFolderOrDescendant(child._id, targetId, allFolders));
+}
+
+/** True if a drag-and-drop move should be refused because the dragged
+ * endpoint's group came from an explicit `@group` declaration in code
+ * (docs/04-capture-engine.md Step 2 #4) rather than a guess — the human
+ * override philosophy every other field in this app follows (drag/rename/
+ * overrides always win) is deliberately NOT applied to a "declared" group's
+ * folder: the code is treated as the more authoritative source, since a
+ * silent sidebar drag could otherwise leave the docs saying something the
+ * codebase itself disagrees with. Such an endpoint can still be reordered
+ * among its CURRENT folder's own siblings (`targetFolderId === currentFolderId`)
+ * — only a move to a genuinely different folder is blocked. Exported for
+ * direct unit testing (see FolderTree.test.ts) — the drag machinery itself
+ * isn't practically unit-testable, but this decision is pure and small
+ * enough to verify in isolation. */
+export function isBlockedGroupMove(
+  groupSource: "declared" | "inferred",
+  currentFolderId: string | null,
+  targetFolderId: string | null,
+): boolean {
+  return groupSource === "declared" && targetFolderId !== currentFolderId;
 }
 
 type DropPosition = "before" | "after" | "inside";
@@ -290,6 +316,13 @@ export function FolderTree(props: FolderTreeProps): JSX.Element {
     if (!draggedRow || !overRow) return;
 
     const draggedIdentity = nodeIdentity(draggedRow.node);
+    // A "declared" group (explicit `@group` tag, docs/04-capture-engine.md
+    // Step 2 #4) locks the endpoint to its current folder — undefined for a
+    // folder row, where this never applies at all.
+    const lockedToFolderId =
+      draggedRow.node.type === "endpoint" && draggedRow.node.endpoint.operation["x-vayo-group-source"] === "declared"
+        ? (draggedRow.node.endpoint.operation["x-vayo-folder-id"] ?? null)
+        : undefined;
     // Uses fullRows (not the collapse-aware `rows`) so a target folder's
     // real existing children are seen even while it's collapsed.
     const sameKindSiblings = (parentId: string | null) =>
@@ -306,6 +339,10 @@ export function FolderTree(props: FolderTreeProps): JSX.Element {
       if (draggedIdentity.kind === "folder" && isFolderOrDescendant(draggedIdentity.id, targetFolderId, props.allFolders)) {
         return; // can't drop a folder into itself or its own descendant
       }
+      if (lockedToFolderId !== undefined && isBlockedGroupMove("declared", lockedToFolderId, targetFolderId)) {
+        props.onBlockedMove(`"${draggedIdentity.label}" is grouped in code via @group — move it there instead of in the sidebar.`);
+        return;
+      }
       props.onReorderSiblings(draggedIdentity.kind, targetFolderId, [...sameKindSiblings(targetFolderId), draggedIdentity.id]);
       setExpanded((prev) => new Set(prev).add(targetFolderId));
       return;
@@ -320,6 +357,10 @@ export function FolderTree(props: FolderTreeProps): JSX.Element {
     const targetParentId = overRow.parentId;
     if (draggedIdentity.kind === "folder" && targetParentId !== null && isFolderOrDescendant(draggedIdentity.id, targetParentId, props.allFolders)) {
       return; // would nest the folder inside itself or its own descendant
+    }
+    if (lockedToFolderId !== undefined && isBlockedGroupMove("declared", lockedToFolderId, targetParentId)) {
+      props.onBlockedMove(`"${draggedIdentity.label}" is grouped in code via @group — move it there instead of in the sidebar.`);
+      return;
     }
     if (draggedRow.node.type !== overRow.node.type) {
       // Mismatched kind (e.g. a folder dropped near an endpoint's row) — no
@@ -366,6 +407,7 @@ export function FolderTree(props: FolderTreeProps): JSX.Element {
     currentSummary: string,
     deletable: "manual" | "possibly-removed" | null,
     label: string,
+    groupLocked: boolean,
   ) {
     if (!props.canEdit) return;
     e.preventDefault();
@@ -380,7 +422,13 @@ export function FolderTree(props: FolderTreeProps): JSX.Element {
             setRenameValue(currentSummary);
           },
         },
-        { label: "Move to…", onClick: () => setMoveTarget({ kind: "endpoint", id: vayoId, currentParentId: folderId }) },
+        // Omitted entirely for a "declared"-group endpoint (an explicit
+        // @group tag in code) — same "don't even offer an action that'll
+        // just get refused" pattern as Delete below. Reordering within the
+        // current folder still works via drag-and-drop.
+        ...(groupLocked
+          ? []
+          : [{ label: "Move to…", onClick: () => setMoveTarget({ kind: "endpoint", id: vayoId, currentParentId: folderId }) }]),
         // A manual (never-captured) placeholder, or one the most recent
         // scan didn't re-find, gets this option — deleting any other
         // captured endpoint would just have it reappear on the next scan
@@ -569,6 +617,7 @@ interface TreeRowProps {
     currentSummary: string,
     deletable: "manual" | "possibly-removed" | null,
     label: string,
+    groupLocked: boolean,
   ) => void;
 }
 
@@ -702,6 +751,7 @@ function TreeRow({ row, ...props }: TreeRowProps): JSX.Element {
               ? "possibly-removed"
               : null,
           endpoint.summary || endpoint.path,
+          endpoint.operation["x-vayo-group-source"] === "declared",
         )
       }
     >
@@ -732,6 +782,14 @@ function TreeRow({ row, ...props }: TreeRowProps): JSX.Element {
           }
         >
           {endpoint.summary || endpoint.path}
+        </span>
+      )}
+      {endpoint.operation["x-vayo-group-source"] === "declared" && (
+        <span
+          className="tree-row__tag-icon"
+          title="Grouped in code via @group — reorder it here, but move it between folders by editing that tag instead."
+        >
+          <Tag size={12} />
         </span>
       )}
       {endpoint.operation["x-vayo-possibly-removed-since"] && (

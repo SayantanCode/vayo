@@ -655,6 +655,7 @@ export function DocsApp({
           onReorderSiblings={canEdit ? handleReorderSiblings : noop}
           onMoveToFolder={canEdit ? handleMoveToFolder : noop}
           onAutoOrganize={canEdit ? handleAutoOrganize : noop}
+          onBlockedMove={setError}
         />
         <main className="docs-app__main">
           {error && <div className="banner banner--error">{error}</div>}

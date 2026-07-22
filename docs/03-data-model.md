@@ -39,7 +39,8 @@ interface EndpointDoc {
   method: string;
   pathTemplate: string;
   version: string;           // FK to vayo_api_versions.version
-  group: string;             // display grouping, e.g. "Orders"
+  group: string;             // display grouping, e.g. "Orders", or "Admin/Users" when nested — see below
+  groupSource: "declared" | "inferred"; // how `group` was populated — see below
   summary: string | null;    // AST-derived if available (e.g. JSDoc), else null
   notes: string | null;      // markdown (+ Mermaid), the per-endpoint frontend-workflow notes — set via override like every other field
   authRequired: boolean;     // see 05-security.md §3 for detection algorithm
@@ -99,6 +100,25 @@ section (DetailsTab) whenever it isn't at the top tier:
   `"observed"` the moment real traffic actually flows through it.
 - `null` exactly when `requestSchema` is (nothing traced yet, from any
   source).
+
+**`group`/`groupSource` — grouping and its provenance** (`04-capture-engine.md`
+Step 2 #4). `group` can be a plain name (`"Orders"`) or a "/"-separated
+nested path (`"Admin/Users"`) — the latter comes from either a nested
+`routes/<a>/<b>/*.ts` file layout or a nested `@group Admin/Users` tag, and
+`autoOrganizeFolders` (`@vayo/db-mongo`) turns each segment into one level
+of real nested sidebar folders. `groupSource` is `"declared"` only when an
+explicit `@group <name>` tag (swagger-jsdoc's own convention) produced
+`group`; every other source — the `routes/` file convention, the
+first-URL-segment fallback, or a manually-created endpoint's free-text
+group field — is `"inferred"`. The UI treats `"declared"` as authoritative
+for folder *placement* specifically: such an endpoint can still be
+reordered among its current folder's own siblings via drag-and-drop, but
+the sidebar refuses to relocate it to a different folder, since that would
+silently diverge from what the code itself says. This is the one
+deliberate exception to this app's usual "manual override always wins"
+rule — every other field (summary, notes, scopes, `authType`, etc.) still
+lets a human's edit win outright over whatever the code or runtime capture
+says.
 
 **`possiblyRemovedSince` flags a static/merged endpoint a `vayo scan` run no
 longer found** (`04-capture-engine.md` §3d), so a genuinely-removed route's
@@ -527,7 +547,12 @@ interface FolderDoc {
 `OverrideDoc` like any other: `targetId = "${vayoId}.folderId"` and
 `"${vayoId}.order"`. This means placement is non-destructive and
 audit-logged for free through the existing override machinery, and
-`resolveEndpoint` needs zero changes to surface it.
+`resolveEndpoint` needs zero changes to surface it. The UI's drag-and-drop
+sidebar refuses to write a *different* `folderId` for an endpoint whose
+`groupSource` is `"declared"` (an explicit `@group` tag, above) — it can
+still reorder that endpoint among its current folder's own siblings (a same-folder
+`.order` change), just not relocate it elsewhere; see
+`04-capture-engine.md` Step 2 #4 for the reasoning.
 
 **Deleting a folder** reparents its direct sub-folders *and* any endpoints
 placed in it to the deleted folder's own parent — never silently orphans or
@@ -535,15 +560,18 @@ cascade-deletes anything, the same principle that governs every other
 destructive-looking action in this system.
 
 **Auto-organizing by detected group:** `VayoDbAdapter.autoOrganizeFolders(version, actorId)`
-creates a root-level folder for any `group` that has no matching folder yet
-and places every endpoint that has *never been placed anywhere* (no
-`folderId` override of any kind — including one explicitly set to root by a
-human, which is itself a placement) into its group's folder. Additive only:
-re-running it after a human has since reorganized things only picks up
-whatever's still unplaced, the same non-destructive philosophy as
-overrides. `vayo scan` (`@vayo/cli`) runs it automatically once per version
-touched; `POST /api/folders/auto-organize` exposes the same behavior for
-teams that add manual endpoints straight from the UI.
+resolves `group` as a "/"-separated path (e.g. `"Admin/Users"`), creating
+(or reusing) one folder per segment nested under the previous one — a
+flat, single-segment `group` still resolves to exactly the one top-level
+folder it always did. It places every endpoint that has *never been placed
+anywhere* (no `folderId` override of any kind — including one explicitly
+set to root by a human, which is itself a placement) into its group's
+(deepest/leaf) folder. Additive only: re-running it after a human has
+since reorganized things only picks up whatever's still unplaced, the same
+non-destructive philosophy as overrides. `vayo scan` (`@vayo/cli`) runs it
+automatically once per version touched; `POST /api/folders/auto-organize`
+exposes the same behavior for teams that add manual endpoints straight
+from the UI.
 
 ## Environments & variables
 

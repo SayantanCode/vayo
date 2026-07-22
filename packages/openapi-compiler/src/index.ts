@@ -53,6 +53,13 @@ export const X_VAYO_REQUEST_SCHEMA_SOURCE = "x-vayo-request-schema-source";
 // endpoint, which is otherwise blocked (docs/05-security.md's
 // endpoint-deletion rule).
 export const X_VAYO_POSSIBLY_REMOVED_SINCE = "x-vayo-possibly-removed-since";
+// "declared" | "inferred" (EndpointDoc.groupSource verbatim), always
+// present (unlike the fields above, `group` itself is never absent either)
+// — "declared" means an explicit `@group` tag in code produced `group`
+// (docs/04-capture-engine.md Step 2 #4), and the UI treats that as
+// authoritative: such an endpoint can be reordered within its current
+// sidebar folder via drag-and-drop, but not relocated to a different one.
+export const X_VAYO_GROUP_SOURCE = "x-vayo-group-source";
 
 export interface OpenAPIDocument {
   openapi: "3.1.0";
@@ -191,6 +198,7 @@ function buildOperation(
     responses: buildResponses(endpoint.responseSchemas),
     [X_VAYO_ID]: endpoint.vayoId,
     [X_VAYO_GROUP]: endpoint.group,
+    [X_VAYO_GROUP_SOURCE]: endpoint.groupSource,
     [X_VAYO_SCOPES]: endpoint.scopes,
     [X_VAYO_MIDDLEWARE_CHAIN]: endpoint.middlewareChain,
     [X_VAYO_AUTH_REQUIRED]: endpoint.authRequired,

@@ -467,6 +467,13 @@ pre {
   flex-shrink: 0;
 }
 
+.tree-row__tag-icon {
+  color: var(--vayo-text-muted);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 /* Drop-into-folder: a full ring around the row, since the whole row is the
    "nest inside this folder" target. Drop-before/drop-after: a top/bottom
    border, meaning "insert as a sibling before/after this row" instead of
