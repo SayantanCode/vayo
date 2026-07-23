@@ -9,7 +9,7 @@
     "url": "git+https://github.com/SayantanCode/vayo.git"
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && pnpm --filter @vayo/ui build",
     "clean": "tsc -b --clean",
     "dev:demo": "pnpm --filter @vayo/demo-app dev",
     "lint": "eslint . --ext .ts,.tsx",
