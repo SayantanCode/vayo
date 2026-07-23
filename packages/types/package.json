@@ -1,6 +1,6 @@
 {
   "name": "@vayo/types",
-  "version": "0.1.0",
+  "version": "0.1.1-beta.0",
   "license": "MIT",
   "description": "Shared TypeScript interfaces for Vayo. No runtime code, no dependencies on any other Vayo package.",
   "repository": {
@@ -10,7 +10,11 @@
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "!dist/**/*.test.js", "!dist/**/*.test.d.ts"],
+  "files": [
+    "dist",
+    "!dist/**/*.test.js",
+    "!dist/**/*.test.d.ts"
+  ],
   "scripts": {
     "build": "tsc -b"
   }
