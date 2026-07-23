@@ -1,0 +1,17 @@
+{
+  "mode": "pre",
+  "tag": "beta",
+  "initialVersions": {
+    "@vayo/demo-app": "0.0.0",
+    "@vayo/ast": "0.1.0",
+    "@vayo/capture-express": "0.1.0",
+    "vayo": "0.1.0",
+    "@vayo/db-mongo": "0.1.0",
+    "@vayo/openapi-compiler": "0.1.0",
+    "@vayo/schema-engine": "0.1.0",
+    "@vayo/server": "0.1.0",
+    "@vayo/types": "0.1.0",
+    "@vayo/ui": "0.1.0"
+  },
+  "changesets": []
+}
