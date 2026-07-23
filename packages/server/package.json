@@ -1,6 +1,6 @@
 {
   "name": "@vayo/server",
-  "version": "0.1.0",
+  "version": "0.1.1-beta.0",
   "license": "MIT",
   "description": "REST API + Socket.IO gateway + static UI hosting. Every mutating route is role-checked server-side (docs/05-security.md).",
   "repository": {
@@ -10,7 +10,11 @@
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "!dist/**/*.test.js", "!dist/**/*.test.d.ts"],
+  "files": [
+    "dist",
+    "!dist/**/*.test.js",
+    "!dist/**/*.test.d.ts"
+  ],
   "scripts": {
     "build": "tsc -b"
   },

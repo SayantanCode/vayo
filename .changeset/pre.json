@@ -13,5 +13,15 @@
     "@vayo/types": "0.1.0",
     "@vayo/ui": "0.1.0"
   },
-  "changesets": []
+  "changesets": [
+    "deprecated-tag-and-server-side-lock",
+    "flows-modal-viewer-controls",
+    "nested-folder-groups",
+    "openapi-annotations-and-settings",
+    "openapi-import",
+    "response-tag-nested-scope-fix",
+    "same-port-embedding-visibility",
+    "stale-endpoint-detection",
+    "swagger-parity-and-security-hardening"
+  ]
 }
