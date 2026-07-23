@@ -1,7 +1,6 @@
 {
   "name": "@vayo/types",
   "version": "0.1.0",
-  "private": true,
   "license": "MIT",
   "description": "Shared TypeScript interfaces for Vayo. No runtime code, no dependencies on any other Vayo package.",
   "repository": {

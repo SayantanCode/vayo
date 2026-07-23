@@ -1,7 +1,6 @@
 {
   "name": "@vayo/openapi-compiler",
   "version": "0.1.0",
-  "private": true,
   "license": "MIT",
   "description": "Compiles resolved endpoints into a valid OpenAPI 3.1 document with x-vayo-* extensions. Validates via @apidevtools/swagger-parser before ever returning a document.",
   "repository": {

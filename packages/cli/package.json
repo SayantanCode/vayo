@@ -1,7 +1,6 @@
 {
   "name": "vayo",
   "version": "0.1.0",
-  "private": true,
   "license": "MIT",
   "description": "npx vayo init / scan / export",
   "repository": {
