@@ -15,7 +15,9 @@ import {
   X_VAYO_SCOPES,
   compile,
   diffSpecs,
+  planOpenApiImport,
   validate,
+  type ImportableEndpointRef,
 } from "./index.js";
 
 function endpoint(overrides: Partial<ResolvedEndpoint> = {}): ResolvedEndpoint {
@@ -678,5 +680,208 @@ describe("diffSpecs", () => {
 
     const diff = diffSpecs(v1, v2, { stripPrefixA: "/api/v1", stripPrefixB: "/api/v2" });
     expect(diff.changed).toEqual([]);
+  });
+});
+
+function importRef(overrides: Partial<ImportableEndpointRef> = {}): ImportableEndpointRef {
+  return {
+    vayoId: "ep_1",
+    method: "GET",
+    pathTemplate: "/api/v1/users/:id",
+    requestSchema: null,
+    responseSchemas: {},
+    ...overrides,
+  };
+}
+
+describe("planOpenApiImport", () => {
+  it("rejects a real Postman Collection export (info.schema signal) instead of silently importing nothing", () => {
+    const postmanExport = {
+      info: {
+        _postman_id: "abc-123",
+        name: "My Company API",
+        schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+      },
+      item: [
+        {
+          name: "Get widget",
+          request: { method: "GET", url: { raw: "{{baseUrl}}/api/v1/widgets/:id", host: ["{{baseUrl}}"], path: ["api", "v1", "widgets", ":id"] } },
+        },
+      ],
+    };
+    expect(() => planOpenApiImport(postmanExport, [], [])).toThrow(/Postman Collection export/);
+  });
+
+  it("rejects a Postman-shaped file even without the schema URL (item[] present, no paths)", () => {
+    const strippedPostmanExport = {
+      info: { name: "My Company API" },
+      item: [{ name: "Get widget", request: { method: "GET", url: { raw: "{{baseUrl}}/api/v1/widgets" } } }],
+    };
+    expect(() => planOpenApiImport(strippedPostmanExport, [], [])).toThrow(/Postman Collection export/);
+  });
+
+  it("does not reject a real OpenAPI document that happens to have neither signal", () => {
+    expect(() => planOpenApiImport({ info: { title: "Real API" }, paths: {} }, [], [])).not.toThrow();
+  });
+
+  it("extracts title/description from info", () => {
+    const plan = planOpenApiImport({ info: { title: "My Company API", description: "Internal API." }, paths: {} }, [], []);
+    expect(plan.title).toBe("My Company API");
+    expect(plan.description).toBe("Internal API.");
+  });
+
+  it("omits title/description when info is missing or blank", () => {
+    const plan = planOpenApiImport({ paths: {} }, [], []);
+    expect(plan.title).toBeUndefined();
+    expect(plan.description).toBeUndefined();
+  });
+
+  it("extracts servers, skipping one whose baseUrl already exists as an environment", () => {
+    const plan = planOpenApiImport(
+      {
+        paths: {},
+        servers: [
+          { url: "https://api.example.com", description: "Production" },
+          { url: "https://already-there.example.com" },
+        ],
+      },
+      [],
+      [{ variables: { baseUrl: "https://already-there.example.com" } }],
+    );
+    expect(plan.servers).toEqual([{ url: "https://api.example.com", description: "Production" }]);
+  });
+
+  it("matches a spec operation to an existing endpoint by method + converted path, extracting summary/description", () => {
+    const spec = {
+      paths: {
+        "/api/v1/users/{id}": {
+          get: { summary: "Fetch a user", description: "Returns the full user record." },
+        },
+      },
+    };
+    const plan = planOpenApiImport(spec, [importRef()], []);
+    expect(plan.matched).toHaveLength(1);
+    expect(plan.matched[0]!.overrides).toEqual({ summary: "Fetch a user", description: "Returns the full user record." });
+    expect(plan.unmatched).toEqual([]);
+  });
+
+  it("reports an operation with no matching already-discovered endpoint as unmatched, never inventing one", () => {
+    const spec = { paths: { "/api/v1/ghost": { get: { summary: "Nothing here in Vayo yet" } } } };
+    const plan = planOpenApiImport(spec, [importRef()], []);
+    expect(plan.matched).toEqual([]);
+    expect(plan.unmatched).toEqual([{ method: "GET", path: "/api/v1/ghost" }]);
+  });
+
+  it("collects a field-level description override only when the existing schema already has that field", () => {
+    const spec = {
+      paths: {
+        "/api/v1/users/{id}": {
+          get: {
+            responses: {
+              "200": {
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        email: { type: "string", description: "The user's contact email." },
+                        ghostField: { type: "string", description: "Not in Vayo's own schema yet." },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    const ref = importRef({
+      responseSchemas: { "200": { type: "object", properties: { email: { type: "string" } } } },
+    });
+    const plan = planOpenApiImport(spec, [ref], []);
+    expect(plan.matched[0]!.overrides).toEqual({
+      "responseSchemas.200.properties.email.description": "The user's contact email.",
+    });
+  });
+
+  it("collects a request-body field description the same way, nested under requestSchema", () => {
+    const spec = {
+      paths: {
+        "/api/v1/users": {
+          post: {
+            requestBody: {
+              content: {
+                "application/json": {
+                  schema: { type: "object", properties: { name: { type: "string", description: "Display name." } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    const ref = importRef({
+      method: "POST",
+      pathTemplate: "/api/v1/users",
+      requestSchema: { type: "object", properties: { name: { type: "string" } } },
+    });
+    const plan = planOpenApiImport(spec, [ref], []);
+    expect(plan.matched[0]!.overrides).toEqual({ "requestSchema.properties.name.description": "Display name." });
+  });
+
+  it("extracts the plural named examples map, one ImportedExample per name", () => {
+    const spec = {
+      paths: {
+        "/api/v1/users/{id}": {
+          get: {
+            responses: {
+              "200": {
+                content: {
+                  "application/json": {
+                    examples: {
+                      success: { value: { id: "abc123" } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    const plan = planOpenApiImport(spec, [importRef()], []);
+    expect(plan.matched[0]!.examples).toEqual([{ statusCode: 200, responseBody: { id: "abc123" }, label: "success" }]);
+  });
+
+  it("falls back to the older singular 'example' field most hand-written specs actually use", () => {
+    const spec = {
+      paths: {
+        "/api/v1/users/{id}": {
+          get: {
+            responses: {
+              "404": { content: { "application/json": { example: { message: "not found" } } } },
+            },
+          },
+        },
+      },
+    };
+    const plan = planOpenApiImport(spec, [importRef()], []);
+    expect(plan.matched[0]!.examples).toEqual([{ statusCode: 404, responseBody: { message: "not found" }, label: null }]);
+  });
+
+  it("ignores non-HTTP-method keys on a path item (parameters/summary siblings)", () => {
+    const spec = {
+      paths: {
+        "/api/v1/users/{id}": {
+          summary: "Shared across methods, not itself a method",
+          parameters: [{ name: "id", in: "path" }],
+          get: { summary: "Fetch a user" },
+        },
+      },
+    };
+    const plan = planOpenApiImport(spec, [importRef()], []);
+    expect(plan.matched).toHaveLength(1);
+    expect(plan.matched[0]!.method).toBe("GET");
   });
 });
