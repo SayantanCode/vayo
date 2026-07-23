@@ -531,6 +531,52 @@ gantt
     does. Environments/Settings changes aren't broadcast over Socket.IO —
     a pre-existing gap (Environments had it before Settings existed), not
     something this pass introduced.
+- **`vayo import <file>`** — the review's other finding: no import
+  capability existed at all. Scoped deliberately as a migration/onboarding
+  aid, not a parallel authoring path — `01-vision-and-market.md`'s own
+  Apidog comparison is explicit that Vayo's differentiator is a human
+  *not* needing to author or import a spec for it to work, so this never
+  invents an endpoint from a spec alone. Enriches endpoints capture/`vayo
+  scan` already discovered (matched by method+path) with
+  `summary`/`description`, per-field schema descriptions (only for a field
+  the endpoint's own captured/declared schema already has — never
+  synthesizes schema structure from import alone), and response examples
+  (as new pinned `vayo_examples`, deduped by status+label) — plus
+  `vayo_settings`/`vayo_environments` from the spec's own
+  `info`/`servers`. Every enriched field goes through the ordinary
+  `vayo_overrides` mechanism, skipped when one already exists unless
+  `--overwrite` is passed; a spec operation with no matching endpoint is
+  reported unmatched, never created. Split the same "plan here, apply
+  there" way `compile()`/`diffSpecs` already are:
+  `@vayo/openapi-compiler`'s `planOpenApiImport` is pure and fully
+  unit-tested without a database; the CLI command is the thin I/O layer.
+  Deliberately v1-scoped: JSON input only (YAML is a clean follow-up via
+  `@apidevtools/swagger-parser`'s own loader, already a dependency), and
+  parameter-level descriptions aren't imported yet, only request/response
+  body schema fields. Postman collection import (create manual
+  endpoints/folders/examples for a team with no captured traffic at all
+  yet) was scoped as a deliberate separate follow-up, not attempted in
+  this pass — a meaningfully different, larger feature (inventing
+  placement/organization from Postman's own folder tree) than enriching
+  endpoints that already exist.
+  - Asked directly whether feeding `vayo import` a real Postman Collection
+    export (rather than an OpenAPI spec) would work — it wouldn't have:
+    a Postman export has no `paths` object at all (`info.name`/`item[]`,
+    nothing resembling OpenAPI's shape), so `planOpenApiImport` would have
+    silently returned an empty plan (0 matched, 0 imported, exit code 0) —
+    a worse failure mode than an error, since it looks like there was
+    simply nothing to import rather than the wrong file. Fixed by
+    detecting the Postman shape (`info.schema`'s `getpostman.com` URL, or
+    `item[]` with no `paths` as a fallback) and rejecting with a named
+    error instead. Verified against the real CLI binary (not just the
+    mocked unit tests) that this uncovered a second, real bug: the thrown
+    error propagated past the command's own `process.exit(0)` and past
+    `index.ts`'s top-level catch (which only sets `process.exitCode`,
+    never force-exits), so the process hung forever on the still-open
+    MongoDB connection — confirmed live by finding the actual hung
+    `node` process still running. Fixed the same way `create-owner.ts`
+    already guards its own risky logic: wrapped in try/catch/finally with
+    an unconditional `process.exit()`.
 
 ## Explicitly deferred past v1
 

@@ -627,6 +627,8 @@ npx vayo init                      # prompts for Mongo URI + AST-entry path,
 npx vayo scan [--config <path>]    # @vayo/ast static pass, merges vayo_endpoints,
                                     # then auto-organizes detected groups into folders
 npx vayo export [--version v1] [--format openapi|postman] [--out <path>]
+npx vayo import <file> [--version v1] [--overwrite]   # enrich already-discovered
+                                    # endpoints from an existing OpenAPI spec
 npx vayo create-owner [--email <e>] [--name <n>] [--password <p>] # bootstrap
                                     # the first standalone-auth login (05-security.md §5)
 npx vayo serve [--port 4100] [--mount /vayo]   # standalone auth mode only
@@ -667,6 +669,29 @@ instead of silently hanging.
 `compilePostmanCollection`/`diffSpecs` logic directly against the database —
 re-exported from `@vayo/server`'s public entry specifically so the CLI never
 needs a running server just to compile or diff a spec.
+
+`vayo import <file>` is a migration/onboarding aid, not a parallel authoring
+path — `01-vision-and-market.md`'s own Apidog comparison is explicit that
+Vayo's differentiator is a human *not* needing to author or import a spec
+for it to work at all, so this deliberately never invents an endpoint from
+a spec alone. It only enriches endpoints capture/`vayo scan` have *already*
+discovered (matched by method + path) with `summary`/`description`,
+per-field schema descriptions (guarded: only for a field the endpoint's own
+captured/declared schema already has — never synthesizes schema structure
+from the import alone), and response examples (as new pinned
+`vayo_examples`, deduped against what's already pinned) — plus project-wide
+`vayo_settings`/`vayo_environments` from the spec's own `info`/`servers`. A
+spec operation with no matching endpoint is reported unmatched, not
+created. Every enriched field is written through the ordinary
+`vayo_overrides` mechanism (skipped when one already exists, unless
+`--overwrite`) — the pure matching/extraction logic
+(`@vayo/openapi-compiler`'s `planOpenApiImport`) is fully unit-tested
+without touching a database at all; this command is the thin I/O layer on
+top, the same "plan here, apply there" split `compile()`/`diffSpecs`
+already follow. Deliberately v1-scoped: JSON input only (no YAML yet — a
+clean follow-up via `@apidevtools/swagger-parser`'s own loader, already a
+`@vayo/openapi-compiler` dependency), and parameter-level descriptions
+aren't imported (only request/response body schema fields).
 
 ## Enforcing the framework-agnostic boundary in code, not just docs
 

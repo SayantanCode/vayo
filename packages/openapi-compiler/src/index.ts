@@ -615,3 +615,245 @@ export function diffSpecs(
 
   return { added, removed, changed };
 }
+
+// ---------------------------------------------------------------------------
+// OpenAPI import (migration/onboarding, not a parallel authoring path):
+// enriches endpoints Vayo *already discovered* via capture/AST scan with
+// content from an existing spec (e.g. a team migrating off swagger-jsdoc) —
+// deliberately never invents new endpoints from a spec alone. Capture/scan
+// stay the sole source of truth for *what exists*; a spec operation with no
+// matching, already-discovered endpoint is reported unmatched, not created
+// as a placeholder. Pure/no I/O — `vayo import` (the CLI) is what turns this
+// plan into real `vayo_overrides`/`vayo_examples`/`vayo_settings`/
+// `vayo_environments` writes, the same "plan here, apply there" split
+// `diffSpecs` above and `compile()` itself already follow.
+// ---------------------------------------------------------------------------
+
+/** The subset of an existing `EndpointDoc` the planner needs to know about:
+ * enough to match a spec operation to it, and enough of its *current*
+ * request/response schemas to decide which of the spec's field
+ * descriptions have something real to attach to (see
+ * `collectDescriptionOverrides` below) — deliberately not the full
+ * `EndpointDoc`, so a caller building this from a DB read doesn't have to
+ * think about which fields matter here. */
+export interface ImportableEndpointRef {
+  vayoId: string;
+  method: string;
+  pathTemplate: string; // Express-style, e.g. "/api/v1/users/:id" — not "/api/v1/users/{id}"
+  requestSchema: JSONSchema | null;
+  responseSchemas: Record<string, JSONSchema>;
+}
+
+export interface ImportedExample {
+  statusCode: number;
+  responseBody: unknown;
+  label: string | null;
+}
+
+export interface ImportMatch {
+  vayoId: string;
+  method: string;
+  pathTemplate: string;
+  /** Field path (relative to the endpoint, e.g. `"summary"`,
+   * `"requestSchema.properties.email.description"`) → value to write as an
+   * override — the exact same generic `${vayoId}.${fieldPath}` mechanism
+   * every other override in the system already uses. */
+  overrides: Record<string, unknown>;
+  examples: ImportedExample[];
+}
+
+export interface ImportPlan {
+  title?: string;
+  description?: string;
+  servers: Array<{ url: string; description?: string }>;
+  matched: ImportMatch[];
+  /** Spec operations with no corresponding already-discovered endpoint —
+   * never auto-created (see this section's own header comment); surfaced
+   * so a human importing can see what didn't apply and why (route not yet
+   * captured/scanned, or genuinely gone). */
+  unmatched: Array<{ method: string; path: string }>;
+}
+
+/** Inverse of `toOpenApiPath` above — a spec's `{param}` back to Express's
+ * `:param`, so a spec operation's path can be matched against
+ * `ImportableEndpointRef.pathTemplate`. */
+function fromOpenApiPath(specPath: string): string {
+  return specPath.replace(/\{([A-Za-z0-9_]+)\}/g, ":$1");
+}
+
+const HTTP_METHOD_KEYS = new Set(["get", "post", "put", "patch", "delete", "options", "head"]);
+
+/** A media-type object's own schema/examples only ever needs to be read
+ * from one entry — `application/json` when present (Vayo's own
+ * convention), else whichever the spec actually declared (a spec Vayo
+ * didn't produce itself may use something else entirely, e.g. `text/plain`
+ * for a legacy endpoint). */
+function pickMediaType(content: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!content) return undefined;
+  return (
+    (content["application/json"] as Record<string, unknown> | undefined) ??
+    (Object.values(content)[0] as Record<string, unknown> | undefined)
+  );
+}
+
+/** Walks an imported schema alongside the endpoint's *existing* schema in
+ * lockstep, collecting a `description` override for every node where both
+ * sides have something at the same path — deliberately guarded on the
+ * existing side (`existing` must be present, not just `imported`), so
+ * import never synthesizes schema structure Vayo's own capture/AST scan
+ * hasn't actually found yet; it only ever annotates what's really there.
+ * Recurses through `properties`/`items` only (no `allOf`/`oneOf`/`anyOf`)
+ * — the only shapes `schema-engine`'s own genson-based inference and Zod
+ * extraction ever produce, so there's nothing on the *existing* side those
+ * branches could ever match against anyway. */
+function collectDescriptionOverrides(
+  imported: JSONSchema | undefined,
+  existing: JSONSchema | undefined,
+  basePath: string,
+  out: Record<string, unknown>,
+): void {
+  if (!imported || !existing) return;
+  if (typeof imported.description === "string" && imported.description.trim()) {
+    out[`${basePath}.description`] = imported.description;
+  }
+  const importedProps = imported.properties as Record<string, JSONSchema> | undefined;
+  const existingProps = existing.properties as Record<string, JSONSchema> | undefined;
+  if (importedProps && existingProps) {
+    for (const [key, importedProp] of Object.entries(importedProps)) {
+      if (existingProps[key]) {
+        collectDescriptionOverrides(importedProp, existingProps[key], `${basePath}.properties.${key}`, out);
+      }
+    }
+  }
+  const importedItems = imported.items as JSONSchema | undefined;
+  const existingItems = existing.items as JSONSchema | undefined;
+  collectDescriptionOverrides(importedItems, existingItems, `${basePath}.items`, out);
+}
+
+/** A media type's example(s) — the plural, named `examples` map (OpenAPI
+ * 3.1's preferred form, and what `@vayo/openapi-compiler` itself emits) when
+ * present, else the older singular `example` field most hand-written specs
+ * (swagger-jsdoc among them) actually use in practice. Each becomes a
+ * pinned `vayo_examples` entry, not another `@example`-style declared one —
+ * there's no code for a *literal* imported value to be declared *in*. */
+function collectImportedExamples(mediaType: Record<string, unknown> | undefined, statusCode: number): ImportedExample[] {
+  if (!mediaType) return [];
+  const examplesMap = mediaType.examples as Record<string, { value?: unknown }> | undefined;
+  if (examplesMap && Object.keys(examplesMap).length > 0) {
+    return Object.entries(examplesMap).map(([name, example]) => ({
+      statusCode,
+      responseBody: example?.value,
+      label: name,
+    }));
+  }
+  if ("example" in mediaType) {
+    return [{ statusCode, responseBody: mediaType.example, label: null }];
+  }
+  return [];
+}
+
+/** A Postman Collection export (`info: {name, schema}`, a top-level `item`
+ * array of requests/folders — see `@vayo/server`'s own `PostmanCollection`
+ * interface, `postman-export.ts`) has no `paths` object at all, so feeding
+ * one into `planOpenApiImport` would otherwise silently produce an empty,
+ * misleadingly-successful-looking plan (0 matched, 0 unmatched, no error)
+ * rather than a clear "wrong file" signal — worse than an error, since it
+ * looks like there was simply nothing to import instead of looking like a
+ * mistake. Checked before anything else runs. The `postman.com` schema URL
+ * is the definitive signal when present; `item` + no `paths` is the
+ * fallback for a collection whose `info.schema` was stripped/edited. */
+function detectPostmanCollection(doc: Record<string, unknown>): boolean {
+  const info = doc.info as Record<string, unknown> | undefined;
+  const schemaUrl = typeof info?.schema === "string" ? info.schema : "";
+  if (schemaUrl.toLowerCase().includes("getpostman.com")) return true;
+  return Array.isArray(doc.item) && !doc.paths;
+}
+
+/**
+ * Plans an import from an existing OpenAPI document (3.0.x or 3.1 — read
+ * permissively, since this only ever extracts plain text/example values,
+ * never reconciles schema-shape differences between the two spec
+ * versions) against endpoints Vayo has already discovered. Pure — no I/O,
+ * no DB access; the CLI (`vayo import`) turns the returned plan into real
+ * writes, the same split `compile()`/`diffSpecs()` above already use.
+ *
+ * Throws (rather than returning an empty plan) when the input looks like a
+ * Postman Collection export instead of an OpenAPI document — Postman
+ * collection import is a distinct, not-yet-built feature (different
+ * shape entirely: `item[]`/`request`/`response`, no `paths`), and silently
+ * matching nothing would be a worse failure mode than a clear error naming
+ * exactly what was wrong.
+ */
+export function planOpenApiImport(
+  spec: unknown,
+  existingEndpoints: ImportableEndpointRef[],
+  existingEnvironments: Array<{ variables: Record<string, string> }>,
+): ImportPlan {
+  const doc = (spec ?? {}) as Record<string, unknown>;
+  if (detectPostmanCollection(doc)) {
+    throw new Error(
+      '@vayo/openapi-compiler: this file looks like a Postman Collection export ("item"/a postman.com schema URL, no "paths") — vayo import only reads OpenAPI specs right now.',
+    );
+  }
+  const info = doc.info as Record<string, unknown> | undefined;
+  const title = typeof info?.title === "string" && info.title.trim() ? info.title : undefined;
+  const description = typeof info?.description === "string" && info.description.trim() ? info.description : undefined;
+
+  const existingBaseUrls = new Set(existingEnvironments.map((env) => env.variables.baseUrl).filter(Boolean));
+  const specServers = Array.isArray(doc.servers) ? (doc.servers as Array<Record<string, unknown>>) : [];
+  const servers = specServers
+    .filter((server) => typeof server.url === "string" && !existingBaseUrls.has(server.url as string))
+    .map((server) => ({
+      url: server.url as string,
+      description: typeof server.description === "string" ? server.description : undefined,
+    }));
+
+  const endpointByKey = new Map<string, ImportableEndpointRef>();
+  for (const ref of existingEndpoints) {
+    endpointByKey.set(`${ref.method.toUpperCase()} ${ref.pathTemplate}`, ref);
+  }
+
+  const matched: ImportMatch[] = [];
+  const unmatched: Array<{ method: string; path: string }> = [];
+  const paths = (doc.paths ?? {}) as Record<string, Record<string, unknown>>;
+
+  for (const [specPath, pathItem] of Object.entries(paths)) {
+    const expressPath = fromOpenApiPath(specPath);
+    for (const [methodKey, rawOperation] of Object.entries(pathItem)) {
+      if (!HTTP_METHOD_KEYS.has(methodKey)) continue;
+      const operation = rawOperation as Record<string, unknown>;
+      const method = methodKey.toUpperCase();
+      const ref = endpointByKey.get(`${method} ${expressPath}`);
+      if (!ref) {
+        unmatched.push({ method, path: specPath });
+        continue;
+      }
+
+      const overrides: Record<string, unknown> = {};
+      if (typeof operation.summary === "string" && operation.summary.trim()) overrides.summary = operation.summary;
+      if (typeof operation.description === "string" && operation.description.trim()) {
+        overrides.description = operation.description;
+      }
+
+      const requestContent = (operation.requestBody as Record<string, unknown> | undefined)?.content as
+        | Record<string, unknown>
+        | undefined;
+      const requestSchema = pickMediaType(requestContent)?.schema as JSONSchema | undefined;
+      collectDescriptionOverrides(requestSchema, ref.requestSchema ?? undefined, "requestSchema", overrides);
+
+      const examples: ImportedExample[] = [];
+      const responses = (operation.responses ?? {}) as Record<string, Record<string, unknown>>;
+      for (const [status, response] of Object.entries(responses)) {
+        const mediaType = pickMediaType(response.content as Record<string, unknown> | undefined);
+        const responseSchema = mediaType?.schema as JSONSchema | undefined;
+        collectDescriptionOverrides(responseSchema, ref.responseSchemas[status], `responseSchemas.${status}`, overrides);
+        const statusCode = Number(status);
+        if (Number.isFinite(statusCode)) examples.push(...collectImportedExamples(mediaType, statusCode));
+      }
+
+      matched.push({ vayoId: ref.vayoId, method, pathTemplate: ref.pathTemplate, overrides, examples });
+    }
+  }
+
+  return { title, description, servers, matched, unmatched };
+}

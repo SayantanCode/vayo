@@ -10,6 +10,7 @@ import { exportCommand } from "./commands/export.js";
 import { serveCommand } from "./commands/serve.js";
 import { diffCommand } from "./commands/diff.js";
 import { createOwnerCommand } from "./commands/create-owner.js";
+import { importCommand } from "./commands/import.js";
 
 loadDotenv();
 
@@ -54,6 +55,15 @@ program
   .option("--port <port>", "port to listen on", "4100")
   .option("--mount <path>", "mount path", "/vayo")
   .action((opts) => serveCommand({ port: opts.port, mount: opts.mount }));
+
+program
+  .command("import <file>")
+  .description(
+    "Enrich already-discovered endpoints (summary/description/schema-field descriptions/examples) from an existing OpenAPI spec — a migration aid, never invents new endpoints",
+  )
+  .option("--version <version>", "API version the spec's endpoints belong to", "v1")
+  .option("--overwrite", "replace an endpoint field's existing override instead of skipping it")
+  .action((file, opts) => importCommand({ format: "openapi", file, version: opts.version, overwrite: opts.overwrite }));
 
 program
   .command("diff <from> <to>")
