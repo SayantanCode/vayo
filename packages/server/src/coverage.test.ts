@@ -16,6 +16,7 @@ function endpoint(overrides: Partial<ResolvedEndpoint> = {}): ResolvedEndpoint {
     deprecated: false,
     deprecatedSource: null,
     summary: "A summary",
+    description: null,
     notes: "Some frontend-workflow notes",
     authRequired: false,
     authType: null,
@@ -28,6 +29,8 @@ function endpoint(overrides: Partial<ResolvedEndpoint> = {}): ResolvedEndpoint {
     // — that check has its own dedicated test with a deliberately
     // success-only override instead.
     responseSchemas: { "200": { type: "object" }, "404": { type: "object" } },
+    declaredResponseStatuses: [],
+    declaredExamples: {},
     paramsSchema: null,
     querySchema: null,
     source: "merged",

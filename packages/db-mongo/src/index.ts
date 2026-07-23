@@ -17,6 +17,7 @@ import {
   type NotificationDoc,
   type OverrideDoc,
   type SessionDoc,
+  type SettingsDoc,
   type TeamMemberDoc,
   type TeamRole,
   type TestRunResult,
@@ -55,6 +56,7 @@ export const COLLECTIONS = {
   testScripts: "vayo_test_scripts",
   flows: "vayo_flows",
   notifications: "vayo_notifications",
+  settings: "vayo_settings",
 } as const;
 
 /** GridFS bucket for Team Chat attachments (03-data-model.md) — not a plain
@@ -611,6 +613,7 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
         // "manual" endpoint.
         groupSource: "inferred",
         summary: input.summary,
+        description: null,
         deprecated: false,
         deprecatedSource: null,
         notes: null,
@@ -621,6 +624,8 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
         requestSchema: null,
         requestSchemaSource: null,
         responseSchemas: {},
+        declaredResponseStatuses: [],
+        declaredExamples: {},
         paramsSchema: null,
         querySchema: null,
         source: "manual",
@@ -843,6 +848,33 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
       }
 
       return { foldersCreated, endpointsPlaced };
+    },
+
+    // `vayo_settings` holds at most one document, found/updated with an
+    // empty filter rather than a fixed `_id` — every other collection in
+    // this file keys by a real ObjectId, and inventing a magic sentinel id
+    // just for this one collection would be more machinery than "there's
+    // only ever one" actually needs.
+    async getSettings(): Promise<SettingsDoc> {
+      const db = await getDb();
+      const raw = await db.collection(COLLECTIONS.settings).findOne({});
+      if (!raw) return { _id: "", title: "Vayo API", description: null, updatedBy: "", updatedAt: "" };
+      return fromMongo<SettingsDoc>(raw);
+    },
+
+    async updateSettings(patch, updatedBy): Promise<SettingsDoc> {
+      const db = await getDb();
+      const existing = await db.collection(COLLECTIONS.settings).findOne({});
+      const next = {
+        title: patch.title ?? (existing?.title as string | undefined) ?? "Vayo API",
+        description: patch.description !== undefined ? patch.description : ((existing?.description as string | null | undefined) ?? null),
+        updatedBy,
+        updatedAt: new Date().toISOString(),
+      };
+      const result = await db
+        .collection(COLLECTIONS.settings)
+        .findOneAndUpdate({}, { $set: next }, { upsert: true, returnDocument: "after" });
+      return fromMongo<SettingsDoc>(result!);
     },
 
     async createEnvironment(environment: Omit<EnvironmentDoc, "_id">): Promise<EnvironmentDoc> {

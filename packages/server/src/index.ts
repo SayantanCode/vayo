@@ -20,6 +20,7 @@ import { attachRealtimeGateway } from "./realtime.js";
 import { createCoverageRouter } from "./routes/coverage.js";
 import { createNotificationsRouter } from "./routes/notifications.js";
 import { createEnvironmentsRouter } from "./routes/environments.js";
+import { createSettingsRouter } from "./routes/settings.js";
 import { createExamplesRouter } from "./routes/examples.js";
 import { createTestScriptsRouter } from "./routes/test-scripts.js";
 import { createFlowsRouter } from "./routes/flows.js";
@@ -257,6 +258,7 @@ export function createServer(options: ServerOptions): VayoServerHandle {
   router.use(createCoverageRouter(deps));
   router.use(createNotificationsRouter(deps));
   router.use(createEnvironmentsRouter(deps));
+  router.use(createSettingsRouter(deps));
   router.use(createExamplesRouter(deps));
   router.use(createTestScriptsRouter(deps));
   router.use(createFlowsRouter(deps));

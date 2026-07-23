@@ -11,6 +11,7 @@ import {
   X_VAYO_ORDER,
   X_VAYO_POSSIBLY_REMOVED_SINCE,
   X_VAYO_REQUEST_SCHEMA_SOURCE,
+  X_VAYO_RESPONSE_SCHEMA_DECLARED_STATUSES,
   X_VAYO_SCOPES,
   compile,
   diffSpecs,
@@ -29,6 +30,7 @@ function endpoint(overrides: Partial<ResolvedEndpoint> = {}): ResolvedEndpoint {
     deprecated: false,
     deprecatedSource: null,
     summary: null,
+    description: null,
     notes: null,
     authRequired: false,
     authType: null,
@@ -37,6 +39,8 @@ function endpoint(overrides: Partial<ResolvedEndpoint> = {}): ResolvedEndpoint {
     requestSchema: null,
     requestSchemaSource: null,
     responseSchemas: {},
+    declaredResponseStatuses: [],
+    declaredExamples: {},
     paramsSchema: null,
     querySchema: null,
     source: "runtime",
@@ -51,6 +55,27 @@ function endpoint(overrides: Partial<ResolvedEndpoint> = {}): ResolvedEndpoint {
 }
 
 describe("compile", () => {
+  it("defaults to the 'Vayo API' title, no description, no servers when no options are passed", async () => {
+    const doc = await compile([endpoint()], "v1");
+    expect(doc.info).toEqual({ title: "Vayo API", version: "v1" });
+    expect(doc.servers).toBeUndefined();
+  });
+
+  it("uses a custom title/description/servers when given, the equivalent of swagger-jsdoc's options.definition", async () => {
+    const doc = await compile([endpoint()], "v1", {
+      title: "My Company API",
+      description: "Internal order-management API.",
+      servers: [{ url: "https://api.example.com", description: "Production" }],
+    });
+    expect(doc.info).toEqual({ title: "My Company API", version: "v1", description: "Internal order-management API." });
+    expect(doc.servers).toEqual([{ url: "https://api.example.com", description: "Production" }]);
+  });
+
+  it("falls back to the default title when an empty string is passed, rather than an empty info.title", async () => {
+    const doc = await compile([endpoint()], "v1", { title: "" });
+    expect(doc.info.title).toBe("Vayo API");
+  });
+
   it("produces a document that validates as OpenAPI 3.1 for a realistic endpoint set", async () => {
     const endpoints: ResolvedEndpoint[] = [
       endpoint({
@@ -217,6 +242,28 @@ describe("compile", () => {
     });
   });
 
+  it("uses multipart/form-data instead of application/json when the schema has a file field", async () => {
+    const doc = await compile(
+      [
+        endpoint({
+          method: "POST",
+          pathTemplate: "/api/v1/users",
+          requestSchema: {
+            type: "object",
+            properties: { name: { type: "string" }, avatar: { type: "string", format: "binary" } },
+          },
+        }),
+      ],
+      "v1",
+    );
+    const op = (doc.paths["/api/v1/users"] as Record<string, any>).post;
+    expect(op.requestBody.content["application/json"]).toBeUndefined();
+    expect(op.requestBody.content["multipart/form-data"].schema).toEqual({
+      type: "object",
+      properties: { name: { type: "string" }, avatar: { type: "string", format: "binary" } },
+    });
+  });
+
   it("emits x-vayo-request-schema-source alongside a requestBody, reflecting its confidence tier", async () => {
     const doc = await compile(
       [
@@ -268,6 +315,115 @@ describe("compile", () => {
       "v1",
     );
     expect((observed.paths["/api/v1/users"] as Record<string, any>).post[X_VAYO_REQUEST_SCHEMA_SOURCE]).toBe("observed");
+  });
+
+  it("emits x-vayo-response-schema-declared-statuses when set, omits it when empty", async () => {
+    const withDeclared = await compile(
+      [endpoint({ responseSchemas: { "200": { type: "object" } }, declaredResponseStatuses: ["200"] })],
+      "v1",
+    );
+    const opDeclared = (withDeclared.paths["/api/v1/users/{id}"] as Record<string, any>).get;
+    expect(opDeclared[X_VAYO_RESPONSE_SCHEMA_DECLARED_STATUSES]).toEqual(["200"]);
+
+    const withoutDeclared = await compile([endpoint({ responseSchemas: { "200": { type: "object" } } })], "v1");
+    const opUndeclared = (withoutDeclared.paths["/api/v1/users/{id}"] as Record<string, any>).get;
+    expect(X_VAYO_RESPONSE_SCHEMA_DECLARED_STATUSES in opUndeclared).toBe(false);
+  });
+
+  it("compiles a declared example into the response's standard OpenAPI examples field", async () => {
+    const doc = await compile(
+      [
+        endpoint({
+          responseSchemas: { "200": { type: "object" } },
+          declaredExamples: { "200": { id: "abc123", total: 42 } },
+        }),
+      ],
+      "v1",
+    );
+    const op = (doc.paths["/api/v1/users/{id}"] as Record<string, any>).get;
+    expect(op.responses["200"].content["application/json"].examples).toEqual({
+      declared: { value: { id: "abc123", total: 42 } },
+    });
+  });
+
+  it("still produces a response entry for a status with a declared example but no captured schema", async () => {
+    const doc = await compile([endpoint({ responseSchemas: {}, declaredExamples: { "404": { message: "not found" } } })], "v1");
+    const op = (doc.paths["/api/v1/users/{id}"] as Record<string, any>).get;
+    expect(op.responses["404"].content["application/json"].examples).toEqual({
+      declared: { value: { message: "not found" } },
+    });
+    expect(op.responses["404"].content["application/json"].schema).toBeUndefined();
+  });
+
+  it("compiles pinned examples into a response's examples field, named after their label", async () => {
+    const doc = await compile([endpoint({ responseSchemas: { "200": { type: "object" } } })], "v1", {
+      pinnedExamplesByVayoId: new Map([
+        [
+          "abc123",
+          [
+            {
+              _id: "ex1",
+              vayoId: "abc123",
+              statusCode: 200,
+              requestBody: null,
+              responseBody: { id: "abc" },
+              capturedAt: "2026-07-01T00:00:00.000Z",
+              redacted: false,
+              pinned: true,
+              label: "Successful login!",
+            },
+          ],
+        ],
+      ]),
+    });
+    const op = (doc.paths["/api/v1/users/{id}"] as Record<string, any>).get;
+    expect(op.responses["200"].content["application/json"].examples).toEqual({
+      "successful-login": { value: { id: "abc" } },
+    });
+  });
+
+  it("combines a declared example with pinned ones, and numbers unlabeled pinned examples when there's more than one", async () => {
+    const doc = await compile(
+      [endpoint({ responseSchemas: { "200": { type: "object" } }, declaredExamples: { "200": { id: "declared" } } })],
+      "v1",
+      {
+        pinnedExamplesByVayoId: new Map([
+          [
+            "abc123",
+            [
+              {
+                _id: "ex1",
+                vayoId: "abc123",
+                statusCode: 200,
+                requestBody: null,
+                responseBody: { id: "first" },
+                capturedAt: "2026-07-01T00:00:00.000Z",
+                redacted: false,
+                pinned: true,
+                label: null,
+              },
+              {
+                _id: "ex2",
+                vayoId: "abc123",
+                statusCode: 200,
+                requestBody: null,
+                responseBody: { id: "second" },
+                capturedAt: "2026-07-02T00:00:00.000Z",
+                redacted: false,
+                pinned: true,
+                label: null,
+              },
+            ],
+          ],
+        ]),
+      },
+    );
+    const op = (doc.paths["/api/v1/users/{id}"] as Record<string, any>).get;
+    expect(op.responses["200"].content["application/json"].examples).toEqual({
+      declared: { value: { id: "declared" } },
+      "pinned-1": { value: { id: "first" } },
+      "pinned-2": { value: { id: "second" } },
+    });
   });
 
   it("emits x-vayo-possibly-removed-since when set, so the UI can offer deletion for a non-manual endpoint", async () => {

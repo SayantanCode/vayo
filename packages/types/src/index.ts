@@ -62,6 +62,14 @@ export interface EndpointDoc {
    * itself says (docs/03-data-model.md "Manual endpoints & folders"). */
   groupSource: "declared" | "inferred";
   summary: string | null;
+  /** Longer, potentially multi-line/multi-paragraph explanation from an
+   * explicit `@description` tag (docs/04-capture-engine.md Step 2 #4c) —
+   * OpenAPI's own standard Operation Object has both a short `summary` and
+   * a longer `description`; Vayo's zero-annotation `summary` extraction
+   * only ever produces the former. `null` when absent, same as `summary`.
+   * Purely descriptive, like `summary` — carries no lock behavior and no
+   * "source" tracking, unlike `groupSource`/`deprecatedSource`. */
+  description: string | null;
   /** OpenAPI's own standard `deprecated` field, not an x-vayo-* extension —
    * true when a human has flagged this ONE endpoint deprecated, independent
    * of the whole API *version*'s own lifecycle (`ApiVersionDoc.status`,
@@ -112,6 +120,31 @@ export interface EndpointDoc {
    * `null` exactly when `requestSchema` is. */
   requestSchemaSource: "declared" | "inferred" | "observed" | null;
   responseSchemas: Record<string, JSONSchema>;
+  /** Status codes within `responseSchemas` whose current shape came (at
+   * least in part) from an explicit `@response <status> <SchemaName>` tag
+   * in code (docs/04-capture-engine.md Step 2 #4b), rather than purely from
+   * runtime capture — the response-schema equivalent of `requestSchemaSource
+   * === "declared"`, kept as a set of statuses rather than a single value
+   * since `responseSchemas` itself is a per-status map. Unlike
+   * `requestSchemaSource`, a declared status never "graduates" away from
+   * this list just because real traffic later confirms it too — the tag is
+   * still there in code, still true, on every subsequent scan. Recomputed
+   * fresh on every `vayo scan` (docs/04-capture-engine.md §3): a status
+   * whose `@response` tag was removed from code drops out of this list on
+   * the next scan, the same unconditional-overwrite rule `deprecatedSource`
+   * already follows. */
+  declaredResponseStatuses: string[];
+  /** Literal example response value(s) declared via one or more `@example
+   * <status> <JSON>` tags in code, keyed by status code — shown in the UI
+   * as a fallback between a real captured/pinned `ExampleDoc` (highest
+   * confidence — actual traffic) and a value synthesized from the schema
+   * alone (lowest confidence — a guess). Recomputed unconditionally on
+   * every scan, same as `declaredResponseStatuses` above: removing the tag
+   * clears the entry. Deliberately kept on `EndpointDoc` rather than written
+   * into the `vayo_examples` collection, so a rescan can freely overwrite it
+   * without the rolling-cap/pinned bookkeeping that collection's real
+   * captured samples need (docs/03-data-model.md). */
+  declaredExamples: Record<string, unknown>;
   paramsSchema: JSONSchema | null;
   /** Schema inferred from `CapturedSample.requestQuery` — query-string
    * parameters (pagination, filtering, sort). Mirrors `paramsSchema` exactly
@@ -363,6 +396,23 @@ export interface NotificationDoc {
    * announced it) and "version_status" (not endpoint-scoped at all). */
   targetId: string | null;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// vayo_settings — a single project-wide document (docs/03-data-model.md),
+// the equivalent of swagger-jsdoc's `options.definition.info`: the compiled
+// spec's own top-level `info.title`/`info.description`, editable through
+// the docs UI rather than only ever hardcoded in a config file. Global
+// across every API version (a version-specific title/description isn't a
+// real-world need this product targets) — distinct from `ApiVersionDoc`,
+// which tracks per-version lifecycle (status/deprecation), not identity.
+// ---------------------------------------------------------------------------
+export interface SettingsDoc {
+  _id: string;
+  title: string;
+  description: string | null;
+  updatedBy: string;
+  updatedAt: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -749,6 +799,17 @@ export interface VayoDbAdapter {
    * `"system:cli-scan"` when triggered from the CLI, which has no team-
    * member/session concept of its own. */
   autoOrganizeFolders(version: string, actorId: string): Promise<{ foldersCreated: number; endpointsPlaced: number }>;
+
+  // -------------------------------------------------------------------------
+  // Project-wide settings (vayo_settings) — one document total, no ID
+  // parameter; see SettingsDoc above.
+  // -------------------------------------------------------------------------
+  /** Never null — returns `{title: "Vayo API", description: null, ...}` as
+   * a sensible default (not persisted) when nothing's been saved yet, so
+   * every caller (the compiled spec, the UI's settings form) can rely on a
+   * value existing without a separate "has this been set up" branch. */
+  getSettings(): Promise<SettingsDoc>;
+  updateSettings(patch: { title?: string; description?: string | null }, updatedBy: string): Promise<SettingsDoc>;
 
   // -------------------------------------------------------------------------
   // Environments (vayo_environments)

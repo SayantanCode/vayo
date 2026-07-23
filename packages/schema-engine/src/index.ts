@@ -40,6 +40,23 @@ function mergeSchemaValue(existing: Schema | null, value: unknown): Schema | nul
   return mergeSchemas([existing, next]) as Schema;
 }
 
+/** Merges each newly-declared (`@response` tag) status's schema into
+ * whatever's already stored for that status — a schema-to-schema union via
+ * genson (unlike `mergeSchemaValue` above, which merges a schema with one
+ * observed *value*), so a rescan refines rather than replaces. Every status
+ * not present in `declared` passes through from `existing` untouched. */
+function mergeDeclaredResponseSchemas(
+  existing: Record<string, JSONSchema> | undefined,
+  declared: Record<string, JSONSchema> | undefined,
+): Record<string, JSONSchema> {
+  const responseSchemas = { ...(existing ?? {}) };
+  for (const [status, schema] of Object.entries(declared ?? {})) {
+    const current = responseSchemas[status] as Schema | undefined;
+    responseSchemas[status] = current ? (mergeSchemas([current, schema as Schema]) as JSONSchema) : schema;
+  }
+  return responseSchemas;
+}
+
 /** Marks the given top-level properties of a (possibly absent) object schema
  * `format: "binary"` — `capture-express`'s `requestBodyFileFields` names
  * which keys came from `req.file`/`req.files` (multer) rather than the JSON
@@ -199,6 +216,11 @@ export function mergeCapturedSample(
     sample.responseBody,
   );
   if (mergedResponseSchema) responseSchemas[statusKey] = mergedResponseSchema;
+  // Runtime capture has no @response/@example signal of its own — preserve
+  // whatever the static scan already declared (mirrors deprecatedSource/
+  // groupSource's own pass-through immediately below).
+  const declaredResponseStatuses = existing?.declaredResponseStatuses ?? [];
+  const declaredExamples = existing?.declaredExamples ?? {};
 
   // Runtime 401-observation: a request that carried no Authorization header
   // and got a 401 back is evidence the endpoint requires auth. OR-merged
@@ -220,6 +242,7 @@ export function mergeCapturedSample(
     group: existing?.group ?? inferGroupFromPath(sample.pathTemplate),
     groupSource: existing?.groupSource ?? "inferred",
     summary: existing?.summary ?? null,
+    description: existing?.description ?? null,
     // Runtime capture has no deprecation signal of its own — preserve
     // whatever the static scan (or a human override, layered on top later
     // by resolveEndpoint) already established.
@@ -233,6 +256,8 @@ export function mergeCapturedSample(
     requestSchema,
     requestSchemaSource,
     responseSchemas,
+    declaredResponseStatuses,
+    declaredExamples,
     paramsSchema,
     querySchema,
     // Monotonic: once a doc has ever been "merged" (both static and runtime
@@ -274,6 +299,11 @@ export interface StaticRouteMergeInput {
    * defaults to "inferred" when omitted. */
   groupSource?: "declared" | "inferred";
   summary: string | null;
+  /** Longer explanation from an explicit `@description` tag
+   * (docs/04-capture-engine.md Step 2 #4c) — optional so any caller still
+   * constructing the older shape (without this field) keeps compiling;
+   * treated identically to `null` when absent. */
+  description?: string | null;
   /** True when `@vayo/ast` found an explicit bare `@deprecated` tag
    * (docs/04-capture-engine.md Step 2 #4a) — optional so any caller still
    * constructing the older shape keeps compiling; defaults to `false`
@@ -290,6 +320,16 @@ export interface StaticRouteMergeInput {
    * to "declared" when omitted, matching every caller that predates this
    * field (all Zod-only). */
   requestSchemaSource?: "declared" | "inferred" | null;
+  /** Response schema(s) declared via one or more `@response <status>
+   * <SchemaName>` tags, keyed by status code (docs/04-capture-engine.md
+   * Step 2 #4b) — optional so any caller still constructing the older
+   * shape (without this field) keeps compiling; treated identically to
+   * `undefined`/`{}` when absent. */
+  declaredResponseSchemas?: Record<string, JSONSchema>;
+  /** Literal example response value(s) declared via one or more `@example
+   * <status> <JSON>` tags, keyed by status code — same optionality
+   * reasoning as `declaredResponseSchemas` above. */
+  declaredExamples?: Record<string, unknown>;
 }
 
 /**
@@ -301,10 +341,12 @@ export interface StaticRouteMergeInput {
  * when a Zod schema was traced, `requestSchema` too — a real schema a team
  * already wrote wins outright over whatever shape runtime traffic happened
  * to exercise, same "static wins when both exist" rule as every other
- * field here. `responseSchemas`/`paramsSchema`/`querySchema` still come
- * from runtime capture only — extracting a route's *response* shape or its
- * param types statically isn't attempted (no tractable single convention
- * the way request-body validation has). A rescan that finds nothing new
+ * field here. `responseSchemas` gets the same treatment, but only for
+ * whichever statuses an explicit `@response` tag actually names — every
+ * other status (and `paramsSchema`/`querySchema` entirely) still comes from
+ * runtime capture only, since there's no tractable single convention for
+ * "guess the response/param shape" the way request-body validation has. A
+ * rescan that finds nothing new
  * (empty scopes, no schema traced, e.g.) never erases what a previous scan
  * or runtime capture already found — non-destructive, same guarantee
  * `resolveEndpoint` gives for overrides.
@@ -334,6 +376,7 @@ export function mergeStaticResult(
     // group value that's actually just a fresh guess.
     groupSource: route.groupSource ?? "inferred",
     summary: route.summary ?? existing?.summary ?? null,
+    description: route.description ?? existing?.description ?? null,
     // Unconditional, same reasoning as group/groupSource immediately
     // above: if the current scan's route no longer carries an explicit
     // @deprecated tag, that must clear deprecatedSource back to null too
@@ -356,7 +399,25 @@ export function mergeStaticResult(
     requestSchemaSource: route.requestSchema
       ? (route.requestSchemaSource ?? "declared")
       : (existing?.requestSchemaSource ?? null),
-    responseSchemas: existing?.responseSchemas ?? {},
+    // Unlike requestSchema's own flat overwrite immediately above, a
+    // declared response schema is *merged* into whatever's already there
+    // for that status, never a wholesale replacement: real response
+    // traffic isn't enforced against the referenced Zod schema the way an
+    // incoming request is (Zod validates req.body, never what a handler
+    // sends back), so it routinely reveals real fields — a joined/computed
+    // property, an extra field a debug build includes — the schema never
+    // declared. Overwriting on every rescan would silently erase exactly
+    // that traffic-observed shape each time the same @response tag gets
+    // re-read, which is the destructive-rescan bug class constraint #3
+    // (docs/00-README.md) exists to rule out. Every other status's
+    // existing (purely runtime-observed) schema passes through untouched.
+    responseSchemas: mergeDeclaredResponseSchemas(existing?.responseSchemas, route.declaredResponseSchemas),
+    // Unconditional, same reasoning as deprecatedSource above: a status
+    // whose @response tag disappeared from code this scan must drop back
+    // out of this list, even though its responseSchemas entry itself
+    // isn't cleared (runtime capture may still legitimately hold one).
+    declaredResponseStatuses: Object.keys(route.declaredResponseSchemas ?? {}),
+    declaredExamples: route.declaredExamples ?? {},
     paramsSchema: existing?.paramsSchema ?? null,
     querySchema: existing?.querySchema ?? null,
     // Monotonic — see the matching comment in mergeCapturedSample: a

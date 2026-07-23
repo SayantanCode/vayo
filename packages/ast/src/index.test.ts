@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildMountPrefixMap,
   DEFAULT_VALIDATION_MIDDLEWARE_PATTERNS,
+  extractDeclaredExamples,
+  extractDeclaredResponseSchemas,
   extractDeprecated,
+  extractDescription,
   extractExplicitGroup,
   extractMiddlewareNames,
   extractSummary,
@@ -252,6 +255,83 @@ describe("extractSummary", () => {
     `);
     expect(extractSummary(call)).toBe("Just an ordinary implementation note, not written for API docs.");
   });
+
+  it("excludes a multi-line @description block's continuation lines, not just the @description line itself", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * Fetch a single order by ID.
+       * @vayo
+       * @description
+       * Returns the full order record including line items.
+       * Use include=customer to also embed customer info.
+       * @group Orders
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractSummary(call)).toBe("Fetch a single order by ID.");
+  });
+});
+
+describe("extractDescription", () => {
+  it("captures inline text right after the tag on the same line", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @vayo
+       * @description Returns the full order record.
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDescription(call)).toBe("Returns the full order record.");
+  });
+
+  it("joins multiple continuation lines into one multi-line description", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @vayo
+       * @description
+       * Returns the full order record including line items.
+       * Use include=customer to also embed customer info.
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDescription(call)).toBe(
+      "Returns the full order record including line items.\nUse include=customer to also embed customer info.",
+    );
+  });
+
+  it("stops at the next recognized tag rather than consuming the rest of the comment", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @vayo
+       * @description Returns the full order record.
+       * @group Orders
+       * @deprecated
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDescription(call)).toBe("Returns the full order record.");
+  });
+
+  it("returns null without the @vayo sentinel", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @description Returns the full order record.
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDescription(call)).toBeNull();
+  });
+
+  it("returns null when there's no @description tag at all", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @vayo
+       * @group Orders
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDescription(call)).toBeNull();
+  });
 });
 
 describe("extractDeprecated", () => {
@@ -315,6 +395,154 @@ describe("extractDeprecated", () => {
       router.get("/orders/:id", (req, res) => res.json({}));
     `);
     expect(extractDeprecated(call)).toBe(false);
+  });
+});
+
+describe("extractDeclaredResponseSchemas", () => {
+  it("resolves a @response tag to the named Zod schema, declared inline", () => {
+    const call = firstRouteRegistration(`
+      const OrderSchema = z.object({ id: z.string(), total: z.number() });
+      /**
+       * @vayo
+       * @response 200 OrderSchema
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDeclaredResponseSchemas(call)).toEqual({
+      "200": {
+        type: "object",
+        properties: { id: { type: "string" }, total: { type: "number" } },
+        required: ["id", "total"],
+      },
+    });
+  });
+
+  it("resolves multiple @response lines, one per status code", () => {
+    const call = firstRouteRegistration(`
+      const OrderSchema = z.object({ id: z.string() });
+      const ErrorSchema = z.object({ message: z.string() });
+      /**
+       * @vayo
+       * @response 200 OrderSchema
+       * @response 404 ErrorSchema
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDeclaredResponseSchemas(call)).toEqual({
+      "200": { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+      "404": { type: "object", properties: { message: { type: "string" } }, required: ["message"] },
+    });
+  });
+
+  it("resolves a schema imported from a different file, not just one declared inline", () => {
+    const call = firstRouteRegistrationAcrossFiles({
+      "\\schemas\\order.schema.ts": `
+        import { z } from "zod";
+        export const OrderSchema = z.object({ id: z.string() });
+      `,
+      "\\routes\\orders.routes.ts": `
+        import { OrderSchema } from "../schemas/order.schema.js";
+        /**
+         * @vayo
+         * @response 200 OrderSchema
+         */
+        router.get("/orders/:id", (req, res) => res.json({}));
+      `,
+    });
+    expect(extractDeclaredResponseSchemas(call)).toEqual({
+      "200": { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+    });
+  });
+
+  it("resolves a schema destructured from a CommonJS require", () => {
+    const call = firstRouteRegistrationAcrossFiles({
+      "\\schemas\\order.schema.js": `
+        const OrderSchema = z.object({ id: z.string() });
+        module.exports = { OrderSchema };
+      `,
+      "\\routes\\orders.routes.js": `
+        const { OrderSchema } = require("../schemas/order.schema.js");
+        /**
+         * @vayo
+         * @response 200 OrderSchema
+         */
+        router.get("/orders/:id", (req, res) => res.json({}));
+      `,
+    });
+    expect(extractDeclaredResponseSchemas(call)).toEqual({
+      "200": { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+    });
+  });
+
+  it("silently skips a status whose named schema doesn't resolve, rather than throwing", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @vayo
+       * @response 200 SomethingNotDeclaredAnywhere
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDeclaredResponseSchemas(call)).toEqual({});
+  });
+
+  it("returns an empty object without the @vayo sentinel", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @response 200 OrderSchema
+       */
+      const OrderSchema = z.object({ id: z.string() });
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDeclaredResponseSchemas(call)).toEqual({});
+  });
+});
+
+describe("extractDeclaredExamples", () => {
+  it("parses a single-line JSON @example for a status code", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @vayo
+       * @example 200 {"id": "abc123", "total": 42.5}
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDeclaredExamples(call)).toEqual({ "200": { id: "abc123", total: 42.5 } });
+  });
+
+  it("parses multiple @example lines for different status codes", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @vayo
+       * @example 200 {"id": "abc123"}
+       * @example 404 {"message": "not found"}
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDeclaredExamples(call)).toEqual({
+      "200": { id: "abc123" },
+      "404": { message: "not found" },
+    });
+  });
+
+  it("silently skips a line with invalid JSON, rather than throwing", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @vayo
+       * @example 200 {not valid json}
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDeclaredExamples(call)).toEqual({});
+  });
+
+  it("returns an empty object without the @vayo sentinel", () => {
+    const call = firstRouteRegistration(`
+      /**
+       * @example 200 {"id": "abc123"}
+       */
+      router.get("/orders/:id", (req, res) => res.json({}));
+    `);
+    expect(extractDeclaredExamples(call)).toEqual({});
   });
 });
 

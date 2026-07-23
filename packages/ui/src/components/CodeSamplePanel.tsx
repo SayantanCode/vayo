@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { ArrowRight, Check, Copy } from "lucide-react";
 import type { ExampleDoc } from "@vayo/types";
-import type { EndpointSummary } from "../types.js";
+import { requestBodySchema, type EndpointSummary } from "../types.js";
 import { exampleFromSchema } from "../example-from-schema.js";
 import { SNIPPET_LANGUAGES } from "../request-snippets.js";
 
@@ -34,7 +34,7 @@ export function CodeSamplePanel({ endpoint, apiOrigin, examples, onTryIt }: Code
   const [copied, setCopied] = useState(false);
   const op = endpoint.operation;
   const hasBody = Boolean(op.requestBody) && !BODY_LESS_METHODS.has(endpoint.method);
-  const requestSchema = op.requestBody?.content["application/json"].schema;
+  const requestSchema = requestBodySchema(op);
 
   const successExample = mostRecentOrPinned(examples.filter((e) => e.statusCode >= 200 && e.statusCode < 300));
   const bodyValue = hasBody ? JSON.stringify(successExample?.requestBody ?? exampleFromSchema(requestSchema), null, 2) : undefined;

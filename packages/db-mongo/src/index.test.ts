@@ -1033,3 +1033,34 @@ describe("createAdapter — notifications", () => {
     expect(updated?.lastSeenNotificationsAt).toBe("2026-07-02T00:00:00.000Z");
   });
 });
+
+describe("createAdapter — settings", () => {
+  it("returns a sensible default before anything's ever been saved", async () => {
+    const settings = await adapter.getSettings();
+    expect(settings).toMatchObject({ title: "Vayo API", description: null });
+  });
+
+  it("persists an update and returns it from a later getSettings call, without duplicating the singleton document", async () => {
+    await adapter.updateSettings({ title: "My Company API", description: "Internal order-management API." }, "member_1");
+    const settings = await adapter.getSettings();
+    expect(settings).toMatchObject({
+      title: "My Company API",
+      description: "Internal order-management API.",
+      updatedBy: "member_1",
+    });
+
+    await adapter.updateSettings({ title: "Renamed API" }, "member_2");
+    const renamed = await adapter.getSettings();
+    expect(renamed).toMatchObject({ title: "Renamed API", description: "Internal order-management API." });
+
+    const docCount = await client.db().collection(COLLECTIONS.settings).countDocuments({});
+    expect(docCount).toBe(1);
+  });
+
+  it("clears description back to null when explicitly patched with null", async () => {
+    await adapter.updateSettings({ description: "Something." }, "member_1");
+    await adapter.updateSettings({ description: null }, "member_1");
+    const settings = await adapter.getSettings();
+    expect(settings.description).toBeNull();
+  });
+});

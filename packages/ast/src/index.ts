@@ -60,6 +60,11 @@ export interface StaticRouteResult {
    * that would silently diverge from what the code itself says. */
   groupSource: "declared" | "inferred";
   summary: string | null;
+  /** Longer, potentially multi-line/multi-paragraph explanation from an
+   * explicit `@description` tag — OpenAPI's own standard Operation Object
+   * distinguishes this from `summary` (a short one-liner); see
+   * `extractDescription`. `null` when absent, same as `summary`. */
+  description: string | null;
   /** True when an explicit bare `@deprecated` tag was found in the route's
    * leading comment (the same OpenAPI/swagger-jsdoc convention `deprecated:
    * true` on an Operation Object mirrors) — docs/04-capture-engine.md Step
@@ -77,6 +82,18 @@ export interface StaticRouteResult {
    * model's schema instead (docs/03-data-model.md) — `null` exactly when
    * `requestSchema` is. */
   requestSchemaSource: "declared" | "inferred" | null;
+  /** Response body shape(s) declared via one or more `@response <status>
+   * <SchemaName>` tags in the route's leading comment, keyed by status code
+   * (docs/04-capture-engine.md Step 2 #4b) — see `extractDeclaredResponseSchemas`
+   * below. Empty when none were found; unlike `requestSchema` there's no
+   * "inferred" convention for a response shape (no Mongoose-model
+   * equivalent for "what does this endpoint send back"), so a declared
+   * response schema is always high-confidence when present at all. */
+  declaredResponseSchemas: Record<string, JSONSchema>;
+  /** Literal example response value(s) declared via one or more `@example
+   * <status> <JSON>` tags, keyed by status code — see
+   * `extractDeclaredExamples` below. Empty when none were found. */
+  declaredExamples: Record<string, unknown>;
 }
 
 export interface StaticScanResult {
@@ -574,8 +591,11 @@ function schemaCallShapeArgument(node: Node): Node | null {
  * "go to definition"). This only has to peel back one more layer: take
  * that property access's parent assignment and return its right-hand
  * side, the actual exported value. A `module.exports = { name }` shorthand
- * object literal resolves further still, straight to `name`'s own
- * declaration — nothing extra needed for that case. */
+ * object literal instead resolves `getDefinitionNodes()` straight to that
+ * `ShorthandPropertyAssignment` itself (confirmed empirically, alongside
+ * the property-access case above) — one more hop through *its* own name
+ * node's definition (an ordinary same-file variable reference) reaches the
+ * real declaration. */
 function resolveIdentifierDeclarationInitializer(node: Node): Node | null {
   if (!Node.isIdentifier(node)) return null;
   for (const def of node.getDefinitionNodes()) {
@@ -587,7 +607,52 @@ function resolveIdentifierDeclarationInitializer(node: Node): Node | null {
       const assignment = def.getParentIfKind(SyntaxKind.BinaryExpression);
       if (assignment && assignment.getLeft() === def) return assignment.getRight();
     }
+    if (Node.isShorthandPropertyAssignment(def)) {
+      const resolved = resolveIdentifierDeclarationInitializer(def.getNameNode());
+      if (resolved) return resolved;
+    }
   }
+  return null;
+}
+
+/** Resolves the schema identifier named in an `@response <status> <Name>`
+ * tag (see `extractDeclaredResponseSchemas` below) back to its Zod schema,
+ * by *name* rather than from an already-found AST reference the way every
+ * other resolver in this file works — the tag only gives us plain text
+ * pulled out of a comment, not a node. Tries, in order: a same-file
+ * `const <Name> = ...`, a named ESM import (`import { Name } from "..."`),
+ * and a CommonJS destructured require (`const { Name } = require("...")`) —
+ * the same three binding shapes `findMongooseRequestSchemaForRoute`'s
+ * cross-reference case already resolves via identifier references, just
+ * located here by name first. Returns null (never guesses) when `name`
+ * doesn't resolve to a real Zod schema through any of the three. */
+function findSchemaByName(sourceFile: SourceFile, name: string): JSONSchema | null {
+  const localVar = sourceFile.getVariableDeclaration(name);
+  if (localVar) {
+    const init = localVar.getInitializer();
+    const schema = init ? zodExpressionToField(init)?.schema : undefined;
+    if (schema) return schema;
+  }
+
+  for (const imp of sourceFile.getImportDeclarations()) {
+    const named = imp.getNamedImports().find((n) => (n.getAliasNode() ?? n.getNameNode()).getText() === name);
+    if (!named) continue;
+    const resolved = resolveIdentifierDeclarationInitializer(named.getAliasNode() ?? named.getNameNode());
+    const schema = resolved ? zodExpressionToField(resolved)?.schema : undefined;
+    if (schema) return schema;
+  }
+
+  for (const varDecl of sourceFile.getVariableDeclarations()) {
+    const nameNode = varDecl.getNameNode();
+    if (!Node.isObjectBindingPattern(nameNode)) continue;
+    for (const element of nameNode.getElements()) {
+      if (element.getName() !== name) continue;
+      const resolved = resolveIdentifierDeclarationInitializer(element.getNameNode());
+      const schema = resolved ? zodExpressionToField(resolved)?.schema : undefined;
+      if (schema) return schema;
+    }
+  }
+
   return null;
 }
 
@@ -851,12 +916,69 @@ function hasVayoDocSentinel(cleaned: string): boolean {
 export function extractSummary(call: CallExpression): string | null {
   const cleaned = getCleanedLeadingComment(call);
   if (!cleaned) return null;
-  const withoutTags = cleaned
-    .split("\n")
-    .filter((line) => !/^@(vayo|group|deprecated)\b/i.test(line.trim()))
+  const lines = cleaned.split("\n");
+  const descriptionRange = findDescriptionBlockRange(lines);
+  const withoutTags = lines
+    .filter((line, i) => {
+      if (/^@(vayo|group|deprecated|response|example|description)\b/i.test(line.trim())) return false;
+      // A multi-line @description block's continuation lines don't start
+      // with "@" themselves, so the filter above alone wouldn't catch them
+      // — they'd otherwise leak into summary too, duplicating the text.
+      if (descriptionRange && i > descriptionRange.start && i < descriptionRange.end) return false;
+      return true;
+    })
     .join("\n")
     .trim();
   return withoutTags.length > 0 ? withoutTags : null;
+}
+
+/** Line range (inclusive start, exclusive end) of a multi-line `@description`
+ * block within a cleaned comment's lines — from the `@description` line
+ * itself through the line before the next `@`-tag, or the comment's end.
+ * Shared by `extractSummary` (to exclude the block's continuation lines,
+ * which don't start with `@` and so wouldn't otherwise be filtered as tag
+ * lines) and `extractDescription` (to capture it). */
+function findDescriptionBlockRange(lines: string[]): { start: number; end: number } | null {
+  const start = lines.findIndex((line) => /^@description\b/i.test(line.trim()));
+  if (start === -1) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^@\w+/.test(lines[i]!.trim())) {
+      end = i;
+      break;
+    }
+  }
+  return { start, end };
+}
+
+/** Explicit `@description` tag in the same leading comment `extractSummary`
+ * reads — OpenAPI's own standard Operation Object distinguishes a short
+ * `summary` (one-liner) from a longer `description` (can be multiple
+ * paragraphs, markdown-supported); Vayo's zero-annotation `summary`
+ * extraction only ever produces the former. Unlike `@group`/`@deprecated`/
+ * `@response`/`@example`, the tag's own text can continue across multiple
+ * lines — everything from right after `@description` on its own line
+ * through the line before the next recognized `@`-tag (or the comment's
+ * end) is joined together, e.g.:
+ * ```
+ *  * @description
+ *  * Returns the full order record including line items.
+ *  * Use `include=customer` to also embed customer info.
+ * ```
+ * Only recognized inside a comment carrying the `@vayo` sentinel
+ * (`hasVayoDocSentinel`) — same reasoning as every other structured tag
+ * here: an incidental "see the @description field" sentence elsewhere
+ * shouldn't silently become this endpoint's documented description. */
+export function extractDescription(call: CallExpression): string | null {
+  const cleaned = getCleanedLeadingComment(call);
+  if (!cleaned || !hasVayoDocSentinel(cleaned)) return null;
+  const lines = cleaned.split("\n");
+  const range = findDescriptionBlockRange(lines);
+  if (!range) return null;
+  const firstLine = lines[range.start]!.trim().replace(/^@description\s*/i, "");
+  const rest = lines.slice(range.start + 1, range.end).map((line) => line.trim());
+  const combined = [firstLine, ...rest].join("\n").trim();
+  return combined.length > 0 ? combined : null;
 }
 
 /** Explicit `@group <name>` tag in the same leading comment `extractSummary`
@@ -899,6 +1021,61 @@ export function extractDeprecated(call: CallExpression): boolean {
   const cleaned = getCleanedLeadingComment(call);
   if (!cleaned || !hasVayoDocSentinel(cleaned)) return false;
   return cleaned.split("\n").some((line) => /^@deprecated$/i.test(line.trim()));
+}
+
+/** Explicit `@response <status> <SchemaName>` tag(s) in the same leading
+ * comment `extractSummary` reads — declares a route's response body shape
+ * for a given status code by pointing at an existing Zod schema identifier
+ * (`findSchemaByName` above), the mirror of how `findRequestSchemaForRoute`
+ * traces a *request* body from a Zod schema — just declared explicitly
+ * rather than found at a fixed call-site convention, since there's no
+ * equivalent "always the last argument to X" shape for a response the way
+ * there is for request-validation middleware. One line per status code,
+ * e.g. `@response 200 OrderSchema` / `@response 404 ErrorSchema` — multiple
+ * lines declare multiple statuses. A name that doesn't resolve to a real
+ * Zod schema anywhere in scope is silently skipped for that line, never
+ * guessed. Only recognized inside a comment carrying the `@vayo` sentinel —
+ * see `extractExplicitGroup`'s comment for why that gate exists at all. */
+export function extractDeclaredResponseSchemas(call: CallExpression): Record<string, JSONSchema> {
+  const cleaned = getCleanedLeadingComment(call);
+  const result: Record<string, JSONSchema> = {};
+  if (!cleaned || !hasVayoDocSentinel(cleaned)) return result;
+  const sourceFile = call.getSourceFile();
+  for (const line of cleaned.split("\n")) {
+    const match = line.trim().match(/^@response\s+(\d{3})\s+([A-Za-z_$][\w$]*)\s*$/i);
+    if (!match) continue;
+    const [, status, name] = match;
+    const schema = findSchemaByName(sourceFile, name!);
+    if (schema) result[status!] = schema;
+  }
+  return result;
+}
+
+/** Explicit `@example <status> <JSON>` tag(s) in the same leading comment —
+ * a literal example response value for a given status code, declared
+ * directly in code rather than captured from real traffic or pinned by a
+ * team member from Try It Now (docs/03-data-model.md `vayo_examples`).
+ * One line per status code, e.g. `@example 200 {"id":"abc","total":42}` —
+ * single-line JSON only (no multi-line objects), to keep parsing this out
+ * of a free-text comment unambiguous. Invalid JSON on a matching line is
+ * silently skipped for that line, never thrown — same "never guess" bar
+ * every other tag here holds itself to. Only recognized inside a comment
+ * carrying the `@vayo` sentinel. */
+export function extractDeclaredExamples(call: CallExpression): Record<string, unknown> {
+  const cleaned = getCleanedLeadingComment(call);
+  const result: Record<string, unknown> = {};
+  if (!cleaned || !hasVayoDocSentinel(cleaned)) return result;
+  for (const line of cleaned.split("\n")) {
+    const match = line.trim().match(/^@example\s+(\d{3})\s+(.+)$/i);
+    if (!match) continue;
+    const [, status, json] = match;
+    try {
+      result[status!] = JSON.parse(json!);
+    } catch {
+      // not valid JSON — skip rather than guess
+    }
+  }
+  return result;
 }
 
 /**
@@ -992,6 +1169,7 @@ export async function scanProject(rootDir: string, config: VayoConfig): Promise<
       );
       const scopes = registration ? extractScopes(registration.call, scopePatterns) : [];
       const summary = registration ? extractSummary(registration.call) : null;
+      const description = registration ? extractDescription(registration.call) : null;
       const explicitGroup = registration ? extractExplicitGroup(registration.call) : null;
       const group = explicitGroup ?? inferGroup(endpoint.path, registration?.call.getSourceFile().getFilePath() ?? entryAbsPath);
       const groupSource: "declared" | "inferred" = explicitGroup ? "declared" : "inferred";
@@ -1000,6 +1178,8 @@ export async function scanProject(rootDir: string, config: VayoConfig): Promise<
       const mongooseRequestSchema = registration && !zodRequestSchema ? findMongooseRequestSchemaForRoute(registration.call) : null;
       const requestSchema = zodRequestSchema ?? mongooseRequestSchema;
       const requestSchemaSource = zodRequestSchema ? "declared" : mongooseRequestSchema ? "inferred" : null;
+      const declaredResponseSchemas = registration ? extractDeclaredResponseSchemas(registration.call) : {};
+      const declaredExamples = registration ? extractDeclaredExamples(registration.call) : {};
       routes.push({
         method,
         pathTemplate: endpoint.path,
@@ -1009,9 +1189,12 @@ export async function scanProject(rootDir: string, config: VayoConfig): Promise<
         group,
         groupSource,
         summary,
+        description,
         deprecated,
         requestSchema,
         requestSchemaSource,
+        declaredResponseSchemas,
+        declaredExamples,
       });
     }
   }

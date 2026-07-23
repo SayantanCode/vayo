@@ -9,12 +9,22 @@ const listOverrides = vi.fn();
 const listFolders = vi.fn();
 const getTestScript = vi.fn();
 const listExamples = vi.fn();
+const getSettings = vi.fn();
+const listEnvironments = vi.fn();
 const resolveEndpoint = vi.fn();
 const compile = vi.fn();
 const compilePostmanCollection = vi.fn();
 
 vi.mock("@vayo/db-mongo", () => ({
-  createAdapter: () => ({ listEndpoints, listOverrides, listFolders, getTestScript, listExamples }),
+  createAdapter: () => ({
+    listEndpoints,
+    listOverrides,
+    listFolders,
+    getTestScript,
+    listExamples,
+    getSettings,
+    listEnvironments,
+  }),
 }));
 vi.mock("@vayo/schema-engine", () => ({ resolveEndpoint: (...args: unknown[]) => resolveEndpoint(...args) }));
 vi.mock("@vayo/openapi-compiler", () => ({ compile: (...args: unknown[]) => compile(...args) }));
@@ -34,6 +44,8 @@ beforeEach(() => {
   listFolders.mockResolvedValue([]);
   getTestScript.mockResolvedValue(null);
   listExamples.mockResolvedValue([]);
+  getSettings.mockResolvedValue({ _id: "1", title: "Vayo API", description: null, updatedBy: "", updatedAt: "" });
+  listEnvironments.mockResolvedValue([]);
   vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
   vi.spyOn(console, "log").mockImplementation(() => {});
 });
@@ -51,10 +63,56 @@ describe("exportCommand — openapi format", () => {
 
     await exportCommand({ version: "v1", format: "openapi" });
 
-    expect(compile).toHaveBeenCalledWith([{ vayoId: "ep_1" }], "v1");
+    expect(compile).toHaveBeenCalledWith([{ vayoId: "ep_1" }], "v1", {
+      title: "Vayo API",
+      description: undefined,
+      servers: [],
+      pinnedExamplesByVayoId: new Map(),
+    });
     const written = JSON.parse(readFileSync(path.join(tmpDir, "openapi.json"), "utf-8"));
     expect(written.paths).toEqual({ "/api/v1/widgets": {} });
     expect(process.exit).toHaveBeenCalledWith(0);
+  });
+
+  it("passes a custom title/description/servers through from vayo_settings/vayo_environments", async () => {
+    listEndpoints.mockResolvedValue([]);
+    compile.mockResolvedValue({ paths: {} });
+    getSettings.mockResolvedValue({
+      _id: "1",
+      title: "My Company API",
+      description: "Internal order-management API.",
+      updatedBy: "member_1",
+      updatedAt: "2026-07-01T00:00:00.000Z",
+    });
+    listEnvironments.mockResolvedValue([
+      { _id: "env_1", name: "Production", variables: { baseUrl: "https://api.example.com" }, isDefault: true },
+      { _id: "env_2", name: "No base URL yet", variables: {}, isDefault: false },
+    ]);
+
+    await exportCommand({ version: "v1", format: "openapi" });
+
+    expect(compile).toHaveBeenCalledWith([], "v1", {
+      title: "My Company API",
+      description: "Internal order-management API.",
+      servers: [{ url: "https://api.example.com", description: "Production" }],
+      pinnedExamplesByVayoId: new Map(),
+    });
+  });
+
+  it("threads only pinned examples through to compile(), keyed by vayoId", async () => {
+    listEndpoints.mockResolvedValue([{ vayoId: "ep_1" }]);
+    compile.mockResolvedValue({ paths: {} });
+    listExamples.mockResolvedValue([
+      { vayoId: "ep_1", pinned: true, statusCode: 200, responseBody: { id: "abc" }, label: "Success" },
+      { vayoId: "ep_1", pinned: false, statusCode: 500, responseBody: { message: "boom" }, label: null }, // filtered out
+    ]);
+
+    await exportCommand({ version: "v1", format: "openapi" });
+
+    const [, , options] = compile.mock.calls[0]!;
+    expect((options as { pinnedExamplesByVayoId: Map<string, unknown[]> }).pinnedExamplesByVayoId.get("ep_1")).toEqual([
+      { vayoId: "ep_1", pinned: true, statusCode: 200, responseBody: { id: "abc" }, label: "Success" },
+    ]);
   });
 
   it("writes to a custom --out path when given", async () => {
@@ -81,7 +139,7 @@ describe("exportCommand — postman format", () => {
     await exportCommand({ version: "v1", format: "postman" });
 
     const [name, resolved, folders, placements, testScripts, pinnedExamples] = compilePostmanCollection.mock.calls[0]!;
-    expect(name).toBe("Vayo API (v1)");
+    expect(name).toBe("Vayo API (v1)"); // "Vayo API" here comes from the getSettings mock default set in beforeEach
     expect(resolved).toEqual([{ vayoId: "ep_1", folderId: "folder_1" }]);
     expect(folders).toEqual([{ _id: "folder_1", name: "Widgets" }]);
     expect(placements.get("ep_1")).toBe("folder_1");

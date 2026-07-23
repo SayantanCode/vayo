@@ -42,6 +42,7 @@ interface EndpointDoc {
   group: string;             // display grouping, e.g. "Orders", or "Admin/Users" when nested — see below
   groupSource: "declared" | "inferred"; // how `group` was populated — see below
   summary: string | null;    // AST-derived if available (e.g. JSDoc), else null
+  description: string | null; // longer explanation from an explicit @description tag — see below
   deprecated: boolean;       // OpenAPI's own standard field, not x-vayo-* — see below
   deprecatedSource: "declared" | null; // "declared" only when an @deprecated tag set deprecated — see below
   notes: string | null;      // markdown (+ Mermaid), the per-endpoint frontend-workflow notes — set via override like every other field
@@ -53,6 +54,8 @@ interface EndpointDoc {
   requestSchema: JSONSchema | null;
   requestSchemaSource: "declared" | "inferred" | "observed" | null; // how requestSchema was populated — see below
   responseSchemas: Record<string /* status code */, JSONSchema>;
+  declaredResponseStatuses: string[]; // status codes in responseSchemas set (at least in part) by an @response tag — see below
+  declaredExamples: Record<string /* status code */, unknown>; // literal example values set by @example tags — see below
   paramsSchema: JSONSchema | null;  // path (:id-style) parameters, always required
   querySchema: JSONSchema | null;   // query-string parameters (?page=&limit=) — required per-field only when genson-js's own required list says a sample always carried it
   source: "runtime" | "static" | "merged" | "manual"; // "manual" = created from the UI, see "Manual endpoints & folders" below
@@ -102,6 +105,49 @@ section (DetailsTab) whenever it isn't at the top tier:
   `"observed"` the moment real traffic actually flows through it.
 - `null` exactly when `requestSchema` is (nothing traced yet, from any
   source).
+
+**`declaredResponseStatuses`/`declaredExamples` — the response-side mirror
+of a declared request schema** (`04-capture-engine.md` Step 2 #4b). There's
+no Mongoose-style "inferred" convention for a *response* shape (nothing
+plays the role a model's own field definitions do for a request body), so
+these two are populated by exactly one static convention each, both gated
+behind the same `@vayo` sentinel comment `@group`/`@deprecated` require:
+
+- `@response <status> <SchemaName>` points at an existing Zod schema
+  identifier (in scope the same way a validation-middleware argument is —
+  same file, a named ESM import, or a CommonJS destructured `require`) and
+  merges it into `responseSchemas[status]`, winning outright over whatever
+  was there before, the same "a schema a team already wrote wins over a
+  guess" rule `requestSchema` follows for its own static-vs-runtime merge.
+  Runtime capture still refines that status's schema further afterwards
+  (`mergeCapturedSample`'s existing per-status merge is unchanged) — a
+  `@response` tag sets the *starting* shape, it doesn't freeze it.
+  `declaredResponseStatuses` just remembers which status keys came from a
+  tag at all, so the UI can tell "the code guarantees this shape" apart
+  from "this is only ever what traffic happened to produce."
+- `@example <status> <JSON>` is a literal example value for a given status
+  — single-line JSON only. `openapi-compiler` compiles it into the
+  response's standard OpenAPI `examples` field (not an `x-vayo-*`
+  extension — `examples` is itself part of the spec), and the UI's
+  Response panel prefers it over a schema-synthesized placeholder whenever
+  no real captured/pinned `ExampleDoc` exists yet for that status.
+
+Both are recomputed unconditionally on every `vayo scan`, the same
+unconditional-overwrite rule `deprecatedSource` follows: remove the tag from
+code, and the next scan clears it back out (the underlying `responseSchemas`
+value itself isn't deleted, just no longer force-overwritten — runtime
+capture may still legitimately hold a schema there).
+
+**`description` — the longer counterpart to `summary`** (`04-capture-engine.md`
+Step 2 #4c). OpenAPI's own standard Operation Object has both fields —
+`summary` a short one-liner, `description` a longer, potentially
+multi-paragraph explanation (Markdown-supported by the spec) — but Vayo's
+zero-annotation `summary` extraction only ever produces the former (whatever
+plain text sits above the route, with no structure to split it further).
+An explicit `@description` tag fills the gap: unlike every other structured
+tag, its own text can continue across multiple comment lines, joined
+together until the next recognized `@`-tag or the comment's end. No
+"source" tracking and no UI lock, same as `summary` — purely descriptive.
 
 **`group`/`groupSource` — grouping and its provenance** (`04-capture-engine.md`
 Step 2 #4). `group` can be a plain name (`"Orders"`) or a "/"-separated
@@ -463,6 +509,54 @@ Unread state is a single cursor, not a per-notification read receipt:
 for a member if it was created after that timestamp, and simple enough to be
 correct at the team sizes this product targets. A member's own actions are
 never counted as unread for themselves.
+
+## `vayo_settings`
+
+A single, project-wide document — no `_id`-based lookup, found/updated with
+an empty filter (there is exactly one). The equivalent of swagger-jsdoc's
+static `options.definition.info`, just editable through the docs UI (a
+"Settings" button in the header) instead of only ever hardcoded in a config
+file:
+
+```typescript
+interface SettingsDoc {
+  _id: ObjectId;
+  title: string;               // compiled spec's info.title; defaults to "Vayo API"
+  description: string | null;  // compiled spec's info.description; omitted from the spec when null
+  updatedBy: string;
+  updatedAt: string;
+}
+```
+
+`@vayo/openapi-compiler`'s `compile()` takes an optional third
+`CompileOptions` argument (`{title?, description?, servers?,
+pinnedExamplesByVayoId?}`) — both `GET /api/spec` and `vayo export
+--format openapi` fetch `vayo_settings` (for `title`/`description`),
+`vayo_environments` (for `servers`, below), and each endpoint's *pinned*
+`vayo_examples` (for `pinnedExamplesByVayoId`, below) before calling it.
+Passing nothing at all reproduces `compile()`'s original default behavior
+exactly (`"Vayo API"`, no description, no servers, no examples) — every
+existing caller that predates this feature keeps compiling and behaving
+identically.
+
+**`servers` is derived from `vayo_environments`, not a separate concept.**
+Each environment with a non-empty `baseUrl` variable (the same well-known
+key `{{baseUrl}}` interpolation, Try It Now, and the Postman export already
+rely on) becomes one OpenAPI Server Object (`{url, description: env.name}`)
+— an environment with no `baseUrl` set yet contributes nothing. This reuses
+the UI management facility Environments already has (`EnvironmentsModal`)
+rather than inventing a second, redundant one just for the exported spec's
+`servers` array.
+
+**`pinnedExamplesByVayoId` compiles real, saved examples into the exported
+spec, not just `@example`-declared ones.** A response's standard OpenAPI
+`examples` field can now hold both: `declared` (from an `@example` tag,
+`04-capture-engine.md` Step 2 #4b) and one entry per pinned `ExampleDoc`
+for that status, named after its own `label` when set (else a generic
+`pinned`/`pinned-N`). Matches the Postman export's own pre-existing
+`pinned`-only filter — a rolling-window auto-captured example is
+ephemeral by design and was never meant for a permanent export either
+way.
 
 ## `vayo_api_versions`
 

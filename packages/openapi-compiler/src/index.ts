@@ -2,7 +2,7 @@
 // Framework-agnostic. Produces valid OpenAPI 3.1 + x-vayo-* extensions.
 // See docs/02-architecture.md and docs/07-api-versioning.md.
 
-import type { AuthType, JSONSchema, ResolvedEndpoint } from "@vayo/types";
+import type { AuthType, ExampleDoc, JSONSchema, ResolvedEndpoint } from "@vayo/types";
 import SwaggerParser from "@apidevtools/swagger-parser";
 
 /** x-vayo-* extension keys — the ONLY place Vayo-specific data may live in
@@ -70,10 +70,24 @@ export const X_VAYO_GROUP_SOURCE = "x-vayo-group-source";
 // endpoint the code itself marks deprecated, while a NOT-code-declared one
 // (this key absent) stays freely toggleable.
 export const X_VAYO_DEPRECATED_SOURCE = "x-vayo-deprecated-source";
+// Status codes within `responses` whose schema came (at least in part)
+// from an explicit `@response <status> <SchemaName>` tag in code
+// (EndpointDoc.declaredResponseStatuses verbatim, docs/04-capture-engine.md
+// Step 2 #4b) — the response-schema equivalent of X_VAYO_REQUEST_SCHEMA_SOURCE,
+// kept as a list of statuses rather than one value since a response schema
+// is itself a per-status map. Omitted entirely when empty, same pattern as
+// X_VAYO_POSSIBLY_REMOVED_SINCE.
+export const X_VAYO_RESPONSE_SCHEMA_DECLARED_STATUSES = "x-vayo-response-schema-declared-statuses";
 
 export interface OpenAPIDocument {
   openapi: "3.1.0";
-  info: { title: string; version: string };
+  info: { title: string; version: string; description?: string };
+  /** OpenAPI's own standard field, populated from Vayo's own Environments
+   * (docs/03-data-model.md `vayo_environments`) rather than a separate
+   * concept — each environment with a `baseUrl` variable becomes one
+   * Server Object. Omitted entirely when there are none, same pattern as
+   * `tags`/`components` below. */
+  servers?: Array<{ url: string; description?: string }>;
   paths: Record<string, unknown>;
   components?: Record<string, unknown>;
   /** OpenAPI's own standard tag-declaration list (distinct `group` values,
@@ -90,6 +104,24 @@ export interface OpenAPIDocument {
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
+}
+
+/** Project-wide metadata for `compile()`'s `info`/`servers` — the
+ * equivalent of swagger-jsdoc's `options.definition.info`/`servers`, just
+ * sourced from Vayo's own `vayo_settings`/`vayo_environments` (docs/03-data-model.md)
+ * instead of a static config object, so it's editable through the docs UI.
+ * All optional; omitting everything reproduces `compile`'s original
+ * behavior exactly ("Vayo API" title, no description, no servers). */
+export interface CompileOptions {
+  title?: string;
+  description?: string;
+  servers?: Array<{ url: string; description?: string }>;
+  /** Pinned/saved examples (`vayo_examples`, `pinned: true`) keyed by
+   * `vayoId` — compiled into each response's `examples` field alongside
+   * any `@example`-declared one (see `buildResponses`). Absent entirely
+   * (or a missing/empty entry for a given endpoint) reproduces `compile`'s
+   * original behavior for that endpoint's examples exactly. */
+  pinnedExamplesByVayoId?: Map<string, ExampleDoc[]>;
 }
 
 const STATUS_DESCRIPTIONS: Record<string, string> = {
@@ -154,21 +186,95 @@ function buildParameters(
 
 /** Every response OpenAPI 3.1 requires a `description`; a captured status
  * code with no known text falls back to a generic one rather than omitting
- * the field (which would itself fail validation). */
-function buildResponses(responseSchemas: Record<string, JSONSchema>): Record<string, unknown> {
-  const entries = Object.entries(responseSchemas);
-  if (entries.length === 0) {
+ * the field (which would itself fail validation). Two sources compile into
+ * the response's own standard OpenAPI `examples` field (not an `x-vayo-*`
+ * extension; `examples` is itself part of the spec), so any OpenAPI-
+ * consuming tool — not just Vayo's own UI — sees them:
+ *   - `declaredExamples` — a literal value per status from one or more
+ *     `@example <status> <JSON>` tags (docs/04-capture-engine.md Step 2
+ *     #4b), under the name `"declared"`.
+ *   - `pinnedExamples` — real captured responses a team member explicitly
+ *     saved from Try It Now (`vayo_examples`, `pinned: true`), one named
+ *     entry per example (its own `label` when set, else a generic
+ *     `pinned`/`pinned-N`). Real, observed traffic — same "actual evidence
+ *     outranks a comment" precedence the UI's own ResponseSamplePanel
+ *     already follows for its own display, just now also reflected in the
+ *     exported spec instead of staying UI-only.
+ * A status with only an example and no schema still gets a response entry
+ * — an example is useful on its own even before any shape is known. */
+function buildResponses(
+  responseSchemas: Record<string, JSONSchema>,
+  declaredExamples: Record<string, unknown>,
+  pinnedExamples: ExampleDoc[],
+): Record<string, unknown> {
+  const pinnedByStatus = new Map<string, ExampleDoc[]>();
+  for (const example of pinnedExamples) {
+    const status = String(example.statusCode);
+    pinnedByStatus.set(status, [...(pinnedByStatus.get(status) ?? []), example]);
+  }
+
+  const statuses = new Set([
+    ...Object.keys(responseSchemas),
+    ...Object.keys(declaredExamples),
+    ...pinnedByStatus.keys(),
+  ]);
+  if (statuses.size === 0) {
     // OpenAPI requires at least one response; nothing was ever captured.
     return { "200": { description: "OK" } };
   }
   const responses: Record<string, unknown> = {};
-  for (const [status, schema] of entries) {
+  for (const status of statuses) {
+    const schema = responseSchemas[status];
+    const content: Record<string, unknown> = {};
+    if (schema) content.schema = schema;
+    const examples = buildExamplesForStatus(declaredExamples[status], pinnedByStatus.get(status) ?? []);
+    if (examples) content.examples = examples;
     responses[status] = {
       description: STATUS_DESCRIPTIONS[status] ?? "Response",
-      content: { "application/json": { schema } },
+      content: { "application/json": content },
     };
   }
   return responses;
+}
+
+/** Turns a slug-unfriendly human label ("Successful login!") into a valid,
+ * readable OpenAPI examples-object key ("successful-login") — falls back
+ * to `null` when nothing alphanumeric survives, so callers can supply their
+ * own generic name instead of emitting an empty key. */
+function slugifyExampleLabel(label: string): string | null {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug.length > 0 ? slug : null;
+}
+
+function buildExamplesForStatus(
+  declaredValue: unknown,
+  pinned: ExampleDoc[],
+): Record<string, { value: unknown }> | undefined {
+  const examples: Record<string, { value: unknown }> = {};
+  if (declaredValue !== undefined) examples.declared = { value: declaredValue };
+  pinned.forEach((example, i) => {
+    const fallbackName = pinned.length > 1 ? `pinned-${i + 1}` : "pinned";
+    const name = (example.label && slugifyExampleLabel(example.label)) || fallbackName;
+    examples[name] = { value: example.responseBody };
+  });
+  return Object.keys(examples).length > 0 ? examples : undefined;
+}
+
+/** True when any top-level property carries `format: "binary"` —
+ * `schema-engine`'s `markFileFields` sets this for a key `capture-express`
+ * reported as an uploaded file (`req.file`/`req.files`, via multer),
+ * docs/03-data-model.md `CapturedSample.requestBodyFileFields`. A real file
+ * upload is never actually JSON on the wire — labeling it
+ * `application/json` (even with a `format: binary` field inside) would be
+ * non-compliant enough to mislead a code generator or a Postman import into
+ * rendering a text field instead of a file picker for it. */
+function requestBodyIsMultipart(schema: JSONSchema): boolean {
+  const properties = schema.properties as Record<string, JSONSchema> | undefined;
+  if (!properties) return false;
+  return Object.values(properties).some((property) => property?.format === "binary");
 }
 
 /** Omits a requestBody entirely when the inferred schema has no properties
@@ -178,7 +284,8 @@ function buildResponses(responseSchemas: Record<string, JSONSchema>): Record<str
 function buildRequestBody(requestSchema: JSONSchema | null): Record<string, unknown> | null {
   const properties = requestSchema?.properties as Record<string, unknown> | undefined;
   if (!properties || Object.keys(properties).length === 0) return null;
-  return { content: { "application/json": { schema: requestSchema } } };
+  const mediaType = requestBodyIsMultipart(requestSchema!) ? "multipart/form-data" : "application/json";
+  return { content: { [mediaType]: { schema: requestSchema } } };
 }
 
 /** Maps a confidently-known authType to a standard OpenAPI security scheme.
@@ -211,6 +318,7 @@ function securitySchemeFor(authType: AuthType): { name: string; scheme: Record<s
 function buildOperation(
   endpoint: ResolvedEndpoint,
   securitySchemes: Record<string, unknown>,
+  pinnedExamplesByVayoId: Map<string, ExampleDoc[]>,
 ): Record<string, unknown> {
   const operation: Record<string, unknown> = {
     operationId: `${endpoint.method.toLowerCase()}_${endpoint.vayoId}`,
@@ -220,7 +328,11 @@ function buildOperation(
     // one unambiguous label in a flat-tag renderer instead of risking two
     // different "Users" groups (under different parents) merging together.
     tags: [endpoint.group],
-    responses: buildResponses(endpoint.responseSchemas),
+    responses: buildResponses(
+      endpoint.responseSchemas,
+      endpoint.declaredExamples,
+      pinnedExamplesByVayoId.get(endpoint.vayoId) ?? [],
+    ),
     [X_VAYO_ID]: endpoint.vayoId,
     [X_VAYO_GROUP]: endpoint.group,
     [X_VAYO_GROUP_SOURCE]: endpoint.groupSource,
@@ -232,8 +344,12 @@ function buildOperation(
   };
 
   if (endpoint.summary) operation.summary = endpoint.summary;
+  if (endpoint.description) operation.description = endpoint.description;
   if (endpoint.notes) operation[X_VAYO_NOTES] = endpoint.notes;
   if (endpoint.possiblyRemovedSince) operation[X_VAYO_POSSIBLY_REMOVED_SINCE] = endpoint.possiblyRemovedSince;
+  if (endpoint.declaredResponseStatuses.length > 0) {
+    operation[X_VAYO_RESPONSE_SCHEMA_DECLARED_STATUSES] = endpoint.declaredResponseStatuses;
+  }
   // `deprecated` is OpenAPI's own standard Operation Object field, not an
   // x-vayo-* extension — omitted entirely when false (its documented
   // default), matching how every other optional field here is only added
@@ -270,7 +386,7 @@ function buildOperation(
   return operation;
 }
 
-function buildDocument(endpoints: ResolvedEndpoint[], version: string): OpenAPIDocument {
+function buildDocument(endpoints: ResolvedEndpoint[], version: string, options: CompileOptions = {}): OpenAPIDocument {
   const inVersion = endpoints.filter((endpoint) => endpoint.version === version);
   const paths: Record<string, Record<string, unknown>> = {};
   const securitySchemes: Record<string, unknown> = {};
@@ -280,18 +396,21 @@ function buildDocument(endpoints: ResolvedEndpoint[], version: string): OpenAPID
   // no top-level `tags` declaration at all (see OpenAPIDocument.tags).
   const seenTags = new Set<string>();
 
+  const pinnedExamplesByVayoId = options.pinnedExamplesByVayoId ?? new Map<string, ExampleDoc[]>();
   for (const endpoint of inVersion) {
     const path = toOpenApiPath(endpoint.pathTemplate);
     paths[path] ??= {};
-    paths[path][endpoint.method.toLowerCase()] = buildOperation(endpoint, securitySchemes);
+    paths[path][endpoint.method.toLowerCase()] = buildOperation(endpoint, securitySchemes, pinnedExamplesByVayoId);
     seenTags.add(endpoint.group);
   }
 
   const doc: OpenAPIDocument = {
     openapi: "3.1.0",
-    info: { title: "Vayo API", version },
+    info: { title: options.title || "Vayo API", version },
     paths,
   };
+  if (options.description) doc.info.description = options.description;
+  if (options.servers && options.servers.length > 0) doc.servers = options.servers;
   if (seenTags.size > 0) {
     doc.tags = [...seenTags].map((name) => ({ name }));
   }
@@ -325,8 +444,12 @@ export async function validate(doc: OpenAPIDocument): Promise<ValidationResult> 
  * this calls internally before ever returning — is inherently async in
  * `@apidevtools/swagger-parser`.
  */
-export async function compile(endpoints: ResolvedEndpoint[], version: string): Promise<OpenAPIDocument> {
-  const doc = buildDocument(endpoints, version);
+export async function compile(
+  endpoints: ResolvedEndpoint[],
+  version: string,
+  options?: CompileOptions,
+): Promise<OpenAPIDocument> {
+  const doc = buildDocument(endpoints, version, options);
   const result = await validate(doc);
   if (!result.valid) {
     throw new Error(

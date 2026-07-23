@@ -27,23 +27,36 @@ export async function exportCommand(options: ExportOptions): Promise<void> {
     endpoints.map(async (endpoint) => resolveEndpoint(endpoint, await db.listOverrides(endpoint.vayoId))),
   );
 
+  // The equivalent of swagger-jsdoc's static options.definition.info/servers
+  // (docs/03-data-model.md `vayo_settings`/`vayo_environments`) — editable
+  // through the docs UI rather than only ever hardcoded here.
+  const [settings, environments] = await Promise.all([db.getSettings(), db.listEnvironments()]);
+  const servers = environments
+    .filter((env) => env.variables.baseUrl)
+    .map((env) => ({ url: env.variables.baseUrl!, description: env.name }));
+
+  // Only `pinned` examples (not the ephemeral rolling-window auto-captures)
+  // — shared by both export formats so a team's saved Try It Now responses
+  // show up in the OpenAPI export exactly as they already did in Postman's.
+  const pinnedExamples = new Map<string, ExampleDoc[]>();
+  for (const endpoint of resolved) {
+    const pinned = (await db.listExamples(endpoint.vayoId)).filter((e) => e.pinned);
+    if (pinned.length > 0) pinnedExamples.set(endpoint.vayoId, pinned);
+  }
+
   if (options.format === "postman") {
     const folders = await db.listFolders(options.version);
     const placements = new Map<string, string | null>();
     const testScripts = new Map<string, TestScriptDoc>();
-    const pinnedExamples = new Map<string, ExampleDoc[]>();
     for (const endpoint of resolved) {
       const folderId = (endpoint as unknown as { folderId?: string | null }).folderId ?? null;
       placements.set(endpoint.vayoId, folderId);
 
       const script = await db.getTestScript(endpoint.vayoId);
       if (script) testScripts.set(endpoint.vayoId, script);
-
-      const pinned = (await db.listExamples(endpoint.vayoId)).filter((e) => e.pinned);
-      if (pinned.length > 0) pinnedExamples.set(endpoint.vayoId, pinned);
     }
     const collection = compilePostmanCollection(
-      `Vayo API (${options.version})`,
+      `${settings.title} (${options.version})`,
       resolved,
       folders,
       placements,
@@ -54,7 +67,12 @@ export async function exportCommand(options: ExportOptions): Promise<void> {
     writeFileSync(outPath, JSON.stringify(collection, null, 2));
     console.log(`vayo: wrote ${outPath} (${collection.item.length} top-level item(s), version ${options.version})`);
   } else {
-    const doc = await compile(resolved, options.version);
+    const doc = await compile(resolved, options.version, {
+      title: settings.title,
+      description: settings.description ?? undefined,
+      servers,
+      pinnedExamplesByVayoId: pinnedExamples,
+    });
     const outPath = path.resolve(process.cwd(), options.out ?? "openapi.json");
     writeFileSync(outPath, JSON.stringify(doc, null, 2));
     console.log(`vayo: wrote ${outPath} (${Object.keys(doc.paths).length} path(s), version ${options.version})`);

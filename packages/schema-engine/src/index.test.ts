@@ -394,6 +394,80 @@ describe("mergeStaticResult", () => {
     expect(rescanned.deprecatedSource).toBeNull();
   });
 
+  it("merges a declared response schema for its status, winning outright, without touching other statuses", () => {
+    const withRuntime = mergeCapturedSample(null, sample({ responseStatus: 200, responseBody: { legacy: true } }));
+    const withDeclared = mergeStaticResult(
+      withRuntime,
+      staticRoute({ declaredResponseSchemas: { "404": { type: "object", properties: { message: { type: "string" } } } } }),
+      "v1",
+    );
+    expect(withDeclared.responseSchemas["404"]).toEqual({ type: "object", properties: { message: { type: "string" } } });
+    expect(withDeclared.responseSchemas["200"]).toEqual(withRuntime.responseSchemas["200"]); // untouched
+    expect(withDeclared.declaredResponseStatuses).toEqual(["404"]);
+  });
+
+  it("clears declaredResponseStatuses (but not the underlying responseSchemas entry) once a later scan's route no longer carries the @response tag", () => {
+    const declared = mergeStaticResult(null, staticRoute({ declaredResponseSchemas: { "200": { type: "object" } } }), "v1");
+    expect(declared.declaredResponseStatuses).toEqual(["200"]);
+
+    const rescanned = mergeStaticResult(declared, staticRoute(), "v1");
+    expect(rescanned.declaredResponseStatuses).toEqual([]);
+    expect(rescanned.responseSchemas["200"]).toEqual({ type: "object" }); // still there, just no longer force-declared
+  });
+
+  it("still lets runtime capture refine a status a @response tag declared", () => {
+    const declared = mergeStaticResult(
+      null,
+      staticRoute({ declaredResponseSchemas: { "200": { type: "object", properties: { id: { type: "string" } } } } }),
+      "v1",
+    );
+    const afterTraffic = mergeCapturedSample(declared, sample({ responseStatus: 200, responseBody: { id: "abc", total: 42 } }));
+    expect((afterTraffic.responseSchemas["200"] as { properties: Record<string, unknown> }).properties).toHaveProperty("total");
+  });
+
+  it("does not let a later rescan erase a field real traffic already merged into a @response-declared status", () => {
+    const declared = mergeStaticResult(
+      null,
+      staticRoute({ declaredResponseSchemas: { "200": { type: "object", properties: { id: { type: "string" } } } } }),
+      "v1",
+    );
+    // Real traffic reveals a field the Zod schema never declared — e.g. a
+    // handler-computed field with nothing enforcing responses match the
+    // referenced request-validation schema (unlike requestSchema, there's
+    // no framework-level guarantee here).
+    const afterTraffic = mergeCapturedSample(declared, sample({ responseStatus: 200, responseBody: { id: "abc", total: 42 } }));
+    expect((afterTraffic.responseSchemas["200"] as { properties: Record<string, unknown> }).properties).toHaveProperty("total");
+
+    // A routine rescan re-declares the exact same @response tag — this must
+    // refine the existing (now richer) schema, not silently discard what
+    // traffic already taught it.
+    const rescanned = mergeStaticResult(
+      afterTraffic,
+      staticRoute({ declaredResponseSchemas: { "200": { type: "object", properties: { id: { type: "string" } } } } }),
+      "v1",
+    );
+    expect((rescanned.responseSchemas["200"] as { properties: Record<string, unknown> }).properties).toHaveProperty("total");
+  });
+
+  it("sets declaredExamples from a scan and clears it once the @example tag disappears", () => {
+    const declared = mergeStaticResult(null, staticRoute({ declaredExamples: { "200": { id: "abc123" } } }), "v1");
+    expect(declared.declaredExamples).toEqual({ "200": { id: "abc123" } });
+
+    const rescanned = mergeStaticResult(declared, staticRoute(), "v1");
+    expect(rescanned.declaredExamples).toEqual({});
+  });
+
+  it("preserves declaredResponseStatuses/declaredExamples across a runtime-only merge (no static signal of its own)", () => {
+    const declared = mergeStaticResult(
+      null,
+      staticRoute({ declaredResponseSchemas: { "200": { type: "object" } }, declaredExamples: { "200": { id: "abc" } } }),
+      "v1",
+    );
+    const afterTraffic = mergeCapturedSample(declared, sample());
+    expect(afterTraffic.declaredResponseStatuses).toEqual(["200"]);
+    expect(afterTraffic.declaredExamples).toEqual({ "200": { id: "abc" } });
+  });
+
   it("promotes a 'manual' placeholder to 'merged' once real runtime traffic arrives", () => {
     const manualDoc: EndpointDoc = {
       _id: "1",
@@ -404,6 +478,7 @@ describe("mergeStaticResult", () => {
       group: "Users",
       groupSource: "inferred",
       summary: "Planned: fetch a single user",
+      description: null,
       deprecated: false,
       deprecatedSource: null,
       notes: null,
@@ -414,6 +489,8 @@ describe("mergeStaticResult", () => {
       requestSchema: null,
       requestSchemaSource: null,
       responseSchemas: {},
+      declaredResponseStatuses: [],
+      declaredExamples: {},
       paramsSchema: null,
       querySchema: null,
       source: "manual",

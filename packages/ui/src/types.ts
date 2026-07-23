@@ -14,14 +14,33 @@ export interface OpenApiParameter {
 
 export interface OpenApiResponse {
   description: string;
-  content?: { "application/json": { schema: JSONSchema } };
+  content?: {
+    "application/json": {
+      schema?: JSONSchema;
+      /** Standard OpenAPI `examples` field — populated by
+       * `@vayo/openapi-compiler` under the `"declared"` key when the
+       * endpoint has an `@example <status> <JSON>` tag for this status
+       * (docs/04-capture-engine.md Step 2 #4b). */
+      examples?: { declared?: { value: unknown } };
+    };
+  };
 }
 
 export interface OpenApiOperation {
   operationId: string;
   summary?: string;
+  /** OpenAPI's own standard field, not an x-vayo-* extension — a longer,
+   * potentially multi-paragraph explanation from an explicit `@description`
+   * tag (docs/04-capture-engine.md Step 2 #4c), distinct from the short
+   * one-liner `summary` above. Absent when there's no `@description` tag. */
+  description?: string;
   parameters?: OpenApiParameter[];
-  requestBody?: { content: { "application/json": { schema: JSONSchema } } };
+  /** `@vayo/openapi-compiler` uses `multipart/form-data` instead of
+   * `application/json` whenever the schema has a file field (`format:
+   * "binary"`, a real file upload is never actually JSON on the wire) — use
+   * `requestBodySchema()` below rather than indexing `application/json`
+   * directly, so both cases resolve the same way. */
+  requestBody?: { content: Record<string, { schema: JSONSchema }> };
   responses: Record<string, OpenApiResponse>;
   security?: Array<Record<string, string[]>>;
   "x-vayo-id": string;
@@ -64,6 +83,14 @@ export interface OpenApiOperation {
    * a human flagged deprecated via the UI (this key absent) stays freely
    * toggleable. */
   "x-vayo-deprecated-source"?: "declared";
+  /** Status codes within `responses` whose schema came (at least in part)
+   * from an explicit `@response <status> <SchemaName>` tag in code
+   * (docs/04-capture-engine.md Step 2 #4b) — omitted entirely when empty.
+   * Drives a "Declared in code" badge in ResponseSamplePanel, the response
+   * equivalent of `x-vayo-request-schema-source`'s "Inferred, unconfirmed"
+   * badge, just signaling the opposite: higher rather than lower
+   * confidence than an ordinary runtime-captured schema. */
+  "x-vayo-response-schema-declared-statuses"?: string[];
 }
 
 export interface OpenApiDoc {
@@ -148,6 +175,17 @@ export function resolveOrigin(template: string, variables: Record<string, string
   const resolved = interpolate(template, variables);
   const hasUnresolvedToken = /\{\{\s*[\w.-]+\s*\}\}/.test(resolved);
   return !resolved || hasUnresolvedToken ? "" : resolved;
+}
+
+/** The request body's schema, regardless of which media type
+ * `@vayo/openapi-compiler` used to wrap it (`application/json` ordinarily,
+ * `multipart/form-data` for a file upload) — callers that only care about
+ * the shape (DetailsTab, CodeSamplePanel) shouldn't need to know or guess
+ * which key is present. `undefined` when there's no request body at all. */
+export function requestBodySchema(op: OpenApiOperation): JSONSchema | undefined {
+  const content = op.requestBody?.content;
+  if (!content) return undefined;
+  return (content["application/json"] ?? content["multipart/form-data"])?.schema;
 }
 
 export function groupBy<T>(items: T[], keyFn: (item: T) => string): Array<[string, T[]]> {

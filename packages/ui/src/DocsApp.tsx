@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import "./theme.css";
-import type { ApiVersionDoc, ApiVersionStatus, EnvironmentDoc, FlowDoc, FolderDoc, NotificationType } from "@vayo/types";
+import type { ApiVersionDoc, ApiVersionStatus, EnvironmentDoc, FlowDoc, FolderDoc, NotificationType, SettingsDoc } from "@vayo/types";
 import { api, ApiError, type ApiConfig } from "./api.js";
 import { useVayoSocket } from "./hooks/useVayoSocket.js";
 import { ConfigProvider } from "./contexts/ConfigContext.js";
@@ -29,12 +29,13 @@ import { DiffModal } from "./components/DiffModal.js";
 import { CoverageModal } from "./components/CoverageModal.js";
 import { GlobalChatDrawer } from "./components/GlobalChatDrawer.js";
 import { ThemeToggle, applyStoredTheme, currentTheme, type ThemeMode } from "./components/ThemeToggle.js";
-import { BookOpen, ListChecks, MessagesSquare, Users, Workflow, X } from "lucide-react";
+import { BookOpen, ListChecks, MessagesSquare, Settings as SettingsIcon, Users, Workflow, X } from "lucide-react";
 import { CommandPalette } from "./components/CommandPalette.js";
 import { CreateFolderModal } from "./components/CreateFolderModal.js";
 import { CreateEndpointModal, type ManualEndpointInput } from "./components/CreateEndpointModal.js";
 import { EndpointHeader } from "./components/EndpointHeader.js";
 import { NotificationBell } from "./components/NotificationBell.js";
+import { SettingsModal } from "./components/SettingsModal.js";
 import { TabBar } from "./components/TabBar.js";
 import { DetailsTab } from "./components/tabs/DetailsTab.js";
 import { FlowmapTab } from "./components/tabs/FlowmapTab.js";
@@ -137,6 +138,8 @@ export function DocsApp({
   const [creatingFolderParentId, setCreatingFolderParentId] = useState<string | null | "none">("none");
   const [creatingEndpointParentId, setCreatingEndpointParentId] = useState<string | null | "none">("none");
   const [environments, setEnvironments] = useState<EnvironmentDoc[]>([]);
+  const [settings, setSettings] = useState<SettingsDoc | null>(null);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [activeEnvironmentId, setActiveEnvironmentIdState] = useState<string | null>(() =>
     localStorage.getItem(ACTIVE_ENV_STORAGE_KEY),
   );
@@ -181,6 +184,14 @@ export function DocsApp({
 
   async function refetchEnvironments() {
     setEnvironments(await api.listEnvironments(config));
+  }
+
+  async function refetchSettings() {
+    setSettings(await api.getSettings(config));
+  }
+
+  async function handleUpdateSettings(patch: { title: string; description: string | null }) {
+    setSettings(await api.updateSettings(config, patch));
   }
 
   async function handleCreateEnvironment(name: string, variables: Record<string, string>) {
@@ -277,6 +288,7 @@ export function DocsApp({
   useEffect(() => {
     if (!token) return;
     refetchEnvironments().catch(() => {});
+    refetchSettings().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, token]);
 
@@ -559,7 +571,7 @@ export function DocsApp({
     <div className="docs-app">
       <header className="docs-app__header">
         <div className="docs-app__title">
-          <span className="docs-app__logo">Vayo</span>
+          <span className="docs-app__logo">{settings?.title || "Vayo API"}</span>
         </div>
         <button type="button" className="docs-app__search-trigger" onClick={() => setPaletteOpen(true)}>
           <span>Search endpoints…</span>
@@ -612,6 +624,15 @@ export function DocsApp({
         >
           <MessagesSquare size={14} />
           <span>Chat</span>
+        </button>
+        <button
+          type="button"
+          className="env-switcher__trigger"
+          onClick={() => setSettingsModalOpen(true)}
+          title="Set the title/description shown in your exported spec"
+        >
+          <SettingsIcon size={14} />
+          <span>Settings</span>
         </button>
         <ThemeToggle value={themeMode} onChange={setThemeMode} />
         <NotificationBell
@@ -786,6 +807,15 @@ export function DocsApp({
           onUpdate={handleUpdateEnvironment}
           onDelete={handleDeleteEnvironment}
           onClose={() => setEnvironmentsModalOpen(false)}
+        />
+      )}
+
+      {settingsModalOpen && settings && (
+        <SettingsModal
+          settings={settings}
+          canEdit={canEdit}
+          onSave={handleUpdateSettings}
+          onClose={() => setSettingsModalOpen(false)}
         />
       )}
 

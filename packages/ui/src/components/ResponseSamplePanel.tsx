@@ -38,7 +38,9 @@ export function ResponseSamplePanel({ endpoint, examples, config, canEdit }: Res
   const active = responseEntries.find(([s]) => s === status) ?? responseEntries[0]!;
   const [activeStatus, activeResponse] = active;
   const schema = activeResponse.content?.["application/json"]?.schema;
+  const declaredExample = activeResponse.content?.["application/json"]?.examples?.declared?.value;
   const matchingExample = mostRecentOrPinned(examples.filter((e) => String(e.statusCode) === activeStatus));
+  const schemaDeclared = (endpoint.operation["x-vayo-response-schema-declared-statuses"] ?? []).includes(activeStatus);
 
   return (
     <div className="response-sample-panel">
@@ -72,9 +74,19 @@ export function ResponseSamplePanel({ endpoint, examples, config, canEdit }: Res
           </button>
         </div>
       </div>
-      <p className="muted response-sample-panel__description">{activeResponse.description}</p>
+      <p className="muted response-sample-panel__description">
+        {activeResponse.description}
+        {schemaDeclared && (
+          <span
+            className="badge badge--declared"
+            title="Declared in code via @response — edit the schema there to change its shape (per-field descriptions can still be added here)."
+          >
+            Declared in code
+          </span>
+        )}
+      </p>
       {mode === "example" ? (
-        <pre className="code-sample-panel__code">{JSON.stringify(matchingExample?.responseBody ?? exampleFromSchema(schema), null, 2)}</pre>
+        <pre className="code-sample-panel__code">{JSON.stringify(matchingExample?.responseBody ?? declaredExample ?? exampleFromSchema(schema), null, 2)}</pre>
       ) : schema ? (
         <SchemaField
           name="response"

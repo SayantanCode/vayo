@@ -739,6 +739,14 @@ pre {
   border-color: var(--vayo-warning);
 }
 
+.badge--declared {
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--vayo-method-get);
+  border-color: var(--vayo-method-get);
+  margin-left: 8px;
+}
+
 /* ---------------------------------------------------------------------- */
 /* Details tab — three-pane convention (Stripe/Redoc/Scalar): content     */
 /* column + a sticky code-sample/response-reference side column.          */
@@ -766,6 +774,13 @@ pre {
   flex-direction: column;
   gap: 20px;
   min-width: 0;
+}
+
+.endpoint-description {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--vayo-text);
+  white-space: pre-wrap;
 }
 
 .field.details-full-path__header {
