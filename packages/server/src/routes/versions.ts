@@ -4,10 +4,42 @@
 import { Router } from "express";
 import { z } from "zod";
 import { resolveEndpoint } from "@vayo/schema-engine";
-import { compile, diffSpecs } from "@vayo/openapi-compiler";
+import { compile, diffSpecs, type CompileOptions } from "@vayo/openapi-compiler";
+import type { ExampleDoc, ResolvedEndpoint, VayoDbAdapter } from "@vayo/types";
 import { requireRole, type VayoAuthedRequest } from "../auth-middleware.js";
 import { autoCatchAsyncErrors } from "../error-handling.js";
 import type { RouteDeps } from "../server-deps.js";
+
+/** `compile()`'s `title`/`description`/`servers`/pinned examples, sourced
+ * from `vayo_settings`/`vayo_environments`/`vayo_examples`
+ * (docs/03-data-model.md) — the equivalent of swagger-jsdoc's static
+ * `options.definition`, just editable through the docs UI instead. Only
+ * environments with a non-empty `baseUrl` variable become a Server Object
+ * (the well-known convention Try It Now/DetailsTab/the Postman export
+ * already rely on); only `pinned` examples are compiled in, matching the
+ * Postman export's own existing filter — auto-captured rolling-window
+ * examples are ephemeral by design, not meant for a permanent export. */
+async function compileOptionsFromDb(db: VayoDbAdapter, resolved: ResolvedEndpoint[]): Promise<CompileOptions> {
+  const [settings, environments] = await Promise.all([db.getSettings(), db.listEnvironments()]);
+  const servers = environments
+    .filter((env) => env.variables.baseUrl)
+    .map((env) => ({ url: env.variables.baseUrl!, description: env.name }));
+
+  const pinnedExamplesByVayoId = new Map<string, ExampleDoc[]>();
+  await Promise.all(
+    resolved.map(async (endpoint) => {
+      const pinned = (await db.listExamples(endpoint.vayoId)).filter((example) => example.pinned);
+      if (pinned.length > 0) pinnedExamplesByVayoId.set(endpoint.vayoId, pinned);
+    }),
+  );
+
+  return {
+    title: settings.title,
+    description: settings.description ?? undefined,
+    servers,
+    pinnedExamplesByVayoId,
+  };
+}
 
 const apiVersionBodySchema = z.object({
   version: z.string().min(1),
@@ -31,7 +63,7 @@ export function createVersionsRouter({ db, io }: RouteDeps): Router {
       endpoints.map(async (endpoint) => resolveEndpoint(endpoint, await db.listOverrides(endpoint.vayoId))),
     );
     try {
-      const doc = await compile(resolved, version);
+      const doc = await compile(resolved, version, await compileOptionsFromDb(db, resolved));
       res.json(doc);
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : "compile failed" });

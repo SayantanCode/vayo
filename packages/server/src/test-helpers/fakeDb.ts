@@ -18,6 +18,7 @@ import type {
   NotificationDoc,
   OverrideDoc,
   SessionDoc,
+  SettingsDoc,
   TeamMemberDoc,
   TeamRole,
   TestRunResult,
@@ -49,8 +50,23 @@ export function createFakeDb(): VayoDbAdapter {
   const apiVersions = new Map<string, ApiVersionDoc>();
   const attachments = new Map<string, AttachmentDoc>();
   const attachmentBytes = new Map<string, Uint8Array>();
+  let settings: SettingsDoc | null = null;
 
   return {
+    async getSettings() {
+      return settings ?? { _id: "", title: "Vayo API", description: null, updatedBy: "", updatedAt: "" };
+    },
+    async updateSettings(patch, updatedBy) {
+      settings = {
+        _id: settings?._id || genId("settings"),
+        title: patch.title ?? settings?.title ?? "Vayo API",
+        description: patch.description !== undefined ? patch.description : (settings?.description ?? null),
+        updatedBy,
+        updatedAt: new Date().toISOString(),
+      };
+      return settings;
+    },
+
     // No @vayo/server route calls this directly (real capture merge/inference
     // lives in db-mongo, covered there) — kept minimally functional so tests
     // can seed a "real, captured" endpoint (source !== "manual") to exercise
@@ -68,6 +84,7 @@ export function createFakeDb(): VayoDbAdapter {
         group: existing?.group ?? "General",
         groupSource: existing?.groupSource ?? "inferred",
         summary: existing?.summary ?? null,
+        description: existing?.description ?? null,
         deprecated: existing?.deprecated ?? false,
         deprecatedSource: existing?.deprecatedSource ?? null,
         notes: existing?.notes ?? null,
@@ -78,6 +95,8 @@ export function createFakeDb(): VayoDbAdapter {
         requestSchema: existing?.requestSchema ?? null,
         requestSchemaSource: existing?.requestSchemaSource ?? null,
         responseSchemas: existing?.responseSchemas ?? {},
+        declaredResponseStatuses: existing?.declaredResponseStatuses ?? [],
+        declaredExamples: existing?.declaredExamples ?? {},
         paramsSchema: existing?.paramsSchema ?? null,
         querySchema: existing?.querySchema ?? null,
         source: existing?.source === "manual" ? "merged" : (existing?.source ?? "runtime"),
@@ -341,6 +360,7 @@ export function createFakeDb(): VayoDbAdapter {
         group: input.group,
         groupSource: "inferred",
         summary: input.summary,
+        description: null,
         deprecated: false,
         deprecatedSource: null,
         notes: null,
@@ -351,6 +371,8 @@ export function createFakeDb(): VayoDbAdapter {
         requestSchema: null,
         requestSchemaSource: null,
         responseSchemas: {},
+        declaredResponseStatuses: [],
+        declaredExamples: {},
         paramsSchema: null,
         querySchema: null,
         source: "manual",

@@ -6,7 +6,7 @@ import { CodeSamplePanel } from "../CodeSamplePanel.js";
 import { ResponseSamplePanel } from "../ResponseSamplePanel.js";
 import { EndpointNotes } from "../EndpointNotes.js";
 import { EnvironmentSwitcher } from "../EnvironmentSwitcher.js";
-import { resolveOrigin, type EndpointSummary } from "../../types.js";
+import { requestBodySchema, resolveOrigin, type EndpointSummary } from "../../types.js";
 import { api } from "../../api.js";
 import { useConfig } from "../../contexts/ConfigContext.js";
 
@@ -38,7 +38,7 @@ export function DetailsTab({
   const scopes = op["x-vayo-scopes"] ?? [];
   const middlewareChain = op["x-vayo-middleware-chain"] ?? [];
   const params = op.parameters ?? [];
-  const requestSchema = op.requestBody?.content["application/json"].schema;
+  const requestSchema = requestBodySchema(op);
   const resolvedOrigin = resolveOrigin(apiOrigin, environment?.variables ?? {});
   const deprecatedLocked = op["x-vayo-deprecated-source"] === "declared";
 
@@ -99,6 +99,7 @@ export function DetailsTab({
             <code>vayo scan</code> to clear this.
           </div>
         )}
+        {op.description && <p className="endpoint-description">{op.description}</p>}
         <CopyField label="RELATIVE PATH" value={endpoint.path} />
 
         <div className="field details-full-path__header">

@@ -34,6 +34,54 @@ describe("api versions + diff + spec", () => {
     expect(Object.keys(spec.body.paths)).toContain("/api/v1/widgets");
   });
 
+  it("/api/spec pulls title/description from vayo_settings and servers from vayo_environments (baseUrl only)", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "viewer");
+    const { token: editorToken } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+
+    await request(app)
+      .patch("/api/settings")
+      .set("Authorization", `Bearer ${editorToken}`)
+      .send({ title: "My Company API", description: "Internal order-management API." });
+    await request(app)
+      .post("/api/environments")
+      .set("Authorization", `Bearer ${editorToken}`)
+      .send({ name: "Production", variables: { baseUrl: "https://api.example.com" } });
+    await request(app)
+      .post("/api/environments")
+      .set("Authorization", `Bearer ${editorToken}`)
+      .send({ name: "No base URL yet", variables: {} });
+
+    const spec = await request(app).get("/api/spec?version=v1").set("Authorization", `Bearer ${token}`);
+    expect(spec.body.info).toMatchObject({ title: "My Company API", description: "Internal order-management API." });
+    expect(spec.body.servers).toEqual([{ url: "https://api.example.com", description: "Production" }]);
+  });
+
+  it("/api/spec compiles a pinned example into the response's own examples field, but not an unpinned one", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "viewer");
+    const { token: editorToken } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+
+    const created = await request(app)
+      .post("/api/endpoints/manual")
+      .set("Authorization", `Bearer ${editorToken}`)
+      .send({ method: "get", pathTemplate: "/api/v1/widgets", version: "v1", group: "Widgets", summary: "List widgets" });
+    const vayoId = created.body.vayoId as string;
+
+    await request(app)
+      .post(`/api/examples/${vayoId}/pin`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ statusCode: 200, requestBody: null, responseBody: { id: "abc123" }, label: "Successful list" });
+
+    const spec = await request(app).get("/api/spec?version=v1").set("Authorization", `Bearer ${token}`);
+    const response200 = spec.body.paths["/api/v1/widgets"].get.responses["200"];
+    expect(response200.content["application/json"].examples).toEqual({
+      "successful-list": { value: { id: "abc123" } },
+    });
+  });
+
   it("/api/diff reports an endpoint added only in the target version", async () => {
     const db = createFakeDb();
     const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });

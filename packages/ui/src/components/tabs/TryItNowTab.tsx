@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronUp, Copy, Search, Trash2, X } from "lucide-react";
 import type { EnvironmentDoc, ExampleDoc } from "@vayo/types";
 import { api } from "../../api.js";
-import { interpolate, type EndpointSummary } from "../../types.js";
+import { interpolate, requestBodySchema, type EndpointSummary } from "../../types.js";
 import { runScriptInWorker, type ScriptTestResult } from "../../script-runner-client.js";
 import { ScriptsPanel } from "../ScriptsPanel.js";
 import { VariableField, type FieldSuggestion, type FieldValidity } from "../VariableField.js";
@@ -170,7 +170,7 @@ export function TryItNowTab({
     // Prefill test data up front, schema-derived — matches Swagger UI's
     // "Try it out" always having *something* to send. Upgraded to a real
     // captured/pinned example below once fetched, if one exists.
-    const requestSchema = op.requestBody?.content["application/json"]?.schema;
+    const requestSchema = requestBodySchema(op);
     if (hasCapturedBodySchema) {
       setBodyText(JSON.stringify(exampleFromSchema(requestSchema), null, 2));
     }

@@ -168,25 +168,29 @@ A route's leading comment is frequently NOT written for Vayo at all — a
 TODO, a lint-disable justification, an explanation of a workaround — and
 such a comment could easily contain text that *looks* like a tag without
 meaning to declare anything ("routes moved out of the old `@group` of
-helpers", "the `@deprecated` flag was removed from the validator"). Since
-`@group`/`@deprecated` carry real behavioral weight (they lock an
-endpoint's folder placement / deprecation status against being changed in
-the UI — #4/#4a above), misreading an unrelated comment as one of them
-would be a silent correctness problem, not just a cosmetic wrong-guess the
-way an odd `summary` would be.
+helpers", "the `@deprecated` flag was removed from the validator", "see
+`@response` docs for the old format"). `@group`/`@deprecated` carry real
+behavioral weight (they lock an endpoint's folder placement / deprecation
+status against being changed in the UI — #4/#4a above), so misreading an
+unrelated comment as one of them would be a silent correctness problem, not
+just a cosmetic wrong-guess the way an odd `summary` would be.
+`@response`/`@example` (#4b) carry no such lock, but the same
+misreading risk applies to them too — an incidental sentence mentioning
+either word shouldn't silently overwrite a real, captured response
+shape/example — so all four tags share the one gate.
 
 A bare `@vayo` line anywhere in the comment is the required opt-in signal
 — the same role `@swagger`/`@openapi` play in swagger-jsdoc, marking a
 comment block as deliberately written for API-doc annotation rather than
-incidentally sitting above a route registration. Without it, `@group`/
-`@deprecated` are never parsed, no matter what text appears in the comment
-— they're just prose, exactly as if the tag characters weren't there at
-all (`@vayo/ast`'s `hasVayoDocSentinel`). This gate does **not** apply to
-the plain-text `summary` itself: a summary being "whatever the nearest
-comment says" is the existing, zero-annotation-required M1 behavior and
-carries no locking behavior, so there's nothing to guard there — the
-`@vayo` line (like `@group`/`@deprecated`) is simply stripped out of the
-displayed summary text when present, same as those two.
+incidentally sitting above a route registration. Without it, none of
+`@group`/`@deprecated`/`@response`/`@example` are ever parsed, no matter
+what text appears in the comment — they're just prose, exactly as if the
+tag characters weren't there at all (`@vayo/ast`'s `hasVayoDocSentinel`).
+This gate does **not** apply to the plain-text `summary` itself: a summary
+being "whatever the nearest comment says" is the existing,
+zero-annotation-required M1 behavior and carries no locking behavior, so
+there's nothing to guard there — the `@vayo` line (like the four tags
+above) is simply stripped out of the displayed summary text when present.
 
 ```js
 /**
@@ -194,6 +198,8 @@ displayed summary text when present, same as those two.
  * @vayo
  * @group Orders
  * @deprecated
+ * @response 200 OrderSchema
+ * @example 404 {"message": "Order not found"}
  */
 router.get("/orders/:id", getOrder);
 ```
@@ -279,6 +285,96 @@ override always wins" that `groupSource: "declared"` already carves out
 for folder placement, above. Re-declaring an already-`true` value (whether
 code-declared or human-set) is treated as a no-op, not an error, since it
 isn't actually contradicting anything.
+
+## Step 2 #4b — Explicit `@response`/`@example` tags (per-status response documentation)
+
+Two more tags recognized in the same `@vayo`-sentinel-gated leading comment,
+each declaring something about a *response*, keyed by HTTP status code —
+the one part of an endpoint's shape that, until now, only ever came from
+runtime capture (no static convention for "guess the response shape" the
+way Zod/Mongoose extraction covers the request body):
+
+- **`@response <status> <SchemaName>`** points at an existing Zod schema
+  identifier and merges its shape into `EndpointDoc.responseSchemas[status]`
+  — the identifier is resolved in scope the same way a validation-middleware
+  argument is (same-file `const`, a named ESM import, or a CommonJS
+  destructured `require`), just located by the plain-text name in the
+  comment rather than from an already-found call-site reference. One line
+  per status code declares multiple statuses. A name that doesn't resolve
+  to a real Zod schema anywhere in scope is silently skipped for that line
+  — never guessed, same bar every other static-extraction convention in
+  this doc holds itself to. The declared schema is *merged* into whatever
+  was already at that status via the same genson-js union
+  `mergeCapturedSample` itself uses (`mergeStaticResult`'s own
+  `mergeDeclaredResponseSchemas`), deliberately not a flat overwrite unlike
+  `requestSchema`'s own "static wins outright" rule immediately above: a
+  response isn't enforced against the referenced Zod schema the way an
+  incoming request is (Zod validates `req.body`, never what a handler sends
+  back), so real traffic routinely reveals fields — a joined/computed
+  property, an extra debug field — the schema never declared, and a flat
+  overwrite on every rescan would silently erase exactly that
+  traffic-learned shape each time the same tag gets re-read.
+  `EndpointDoc.declaredResponseStatuses` records which status keys came
+  from a tag at all, so the UI/spec consumers can tell "the code guarantees
+  this shape" apart from "this is only ever what traffic happened to
+  produce" — recomputed unconditionally on every scan, same as
+  `deprecatedSource`: remove the tag, and the next scan drops that status
+  back out of the list (though the `responseSchemas` value itself isn't
+  cleared, since runtime capture may still legitimately hold one there).
+- **`@example <status> <JSON>`** is a literal example response value for a
+  given status — single-line JSON only (no multi-line objects), to keep
+  parsing it out of a free-text comment unambiguous; invalid JSON on a
+  matching line is silently skipped, never thrown. Stored in
+  `EndpointDoc.declaredExamples`, recomputed unconditionally on every scan
+  just like `declaredResponseStatuses` above. `openapi-compiler` compiles
+  it straight into the response's own standard OpenAPI `examples` field
+  (under the name `"declared"`) — not an `x-vayo-*` extension, since
+  `examples` is itself part of the spec, so any OpenAPI-consuming tool sees
+  it, not just Vayo's own UI. The Response panel (DetailsTab) prefers a
+  real captured/pinned `ExampleDoc` first (actual traffic, highest
+  confidence), then a declared example (code says this is what it looks
+  like), and only falls back to a value synthesized from the schema alone
+  (a guess) when neither exists yet.
+
+Unlike `@group`/`@deprecated`, neither tag carries any UI-lock behavior —
+`checkOverrideAllowed` never blocks editing a response schema or an
+example through the docs UI, since these are purely descriptive content,
+not an access-control or placement decision the code needs to stay
+authoritative over.
+
+## Step 2 #4c — Explicit `@description` tag (the longer counterpart to `summary`)
+
+OpenAPI's own standard Operation Object has both a short `summary`
+(one-liner) and a longer `description` (can be multiple paragraphs,
+Markdown-supported) — Vayo's zero-annotation `summary` extraction only ever
+produces the former (whatever plain text sits above the route, with no
+structure to split it further). An explicit `@description` tag fills that
+gap, in the same leading comment `summary`/`@group` read. Unlike every
+other structured tag in this doc, its own text can continue across
+multiple lines: everything from right after `@description` (inline text on
+the same line is allowed too) through the line before the next recognized
+`@`-tag, or the comment's end, is joined together:
+
+```js
+/**
+ * Fetch a single order by ID.
+ * @vayo
+ * @description
+ * Returns the full order record including line items.
+ * Use `include=customer` to also embed customer info.
+ * @group Orders
+ */
+router.get("/orders/:id", getOrder);
+```
+
+Only recognized inside a comment carrying the `@vayo` sentinel, same
+reasoning as every other structured tag — an incidental "see the
+`@description` field" sentence elsewhere in an unrelated comment shouldn't
+silently become this endpoint's documented description. Purely descriptive
+like `summary`: no "source" tracking, no UI lock, unconditionally
+overwritten (or cleared to `null`) on every rescan, same as `summary`
+itself. Compiles straight into the operation's own standard OpenAPI
+`description` field (not an `x-vayo-*` extension).
 
 ## Step 3 — Merge precedence (static vs. runtime vs. override)
 

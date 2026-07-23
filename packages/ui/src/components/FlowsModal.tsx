@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import type { EnvironmentDoc, ExampleDoc, FlowDoc, FlowStep } from "@vayo/types";
 import { api } from "../api.js";
-import { interpolate, type EndpointSummary } from "../types.js";
+import { interpolate, requestBodySchema, type EndpointSummary } from "../types.js";
 import { exampleFromSchema } from "../example-from-schema.js";
 import { resolveDotPath } from "../dot-path.js";
 import { runScriptInWorker, type ScriptTestResult } from "../script-runner-client.js";
@@ -191,7 +191,7 @@ export function FlowsModal({
         try {
           const examples = await api.listExamples(config, endpoint.vayoId);
           const example = mostRecentOrPinnedExample(examples);
-          const requestSchema = op.requestBody?.content["application/json"].schema;
+          const requestSchema = requestBodySchema(op);
           bodyText = JSON.stringify(example?.requestBody ?? exampleFromSchema(requestSchema));
         } catch {
           bodyText = "{}";

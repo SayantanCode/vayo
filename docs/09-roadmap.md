@@ -475,6 +475,62 @@ gantt
     source-side "God file" problem it was mirroring is now fully solved;
     splitting the test file the same way is real but lower-value follow-up
     work, not something with its own separate risk to carry.
+- `@vayo/ast` gained three more swagger-jsdoc-style leading-comment tags,
+  all gated behind the same `@vayo` sentinel `@group`/`@deprecated` already
+  require: `@response <status> <SchemaName>` (a Zod schema resolved by
+  name — same-file `const`, ESM import, or CommonJS destructured
+  `require`) and `@example <status> <JSON>` populate
+  `EndpointDoc.responseSchemas`/`declaredExamples` per status
+  (docs/04-capture-engine.md Step 2 #4b); `@description` is the multi-line
+  counterpart to the existing zero-annotation `summary` (Step 2 #4c),
+  mirroring OpenAPI's own summary/description split. Fixing
+  `resolveIdentifierDeclarationInitializer` to also follow a
+  `module.exports = { Name }` shorthand-property CommonJS export (found
+  while building `@response`'s by-name resolution) turned out to fix a
+  latent gap in the existing Mongoose-model resolution path too, not just
+  the new feature.
+- **`vayo_settings`** (project-wide `title`/`description` — the equivalent
+  of swagger-jsdoc's `options.definition.info`, editable through a new
+  "Settings" button in the docs UI rather than only ever hardcoded) plus
+  **`servers`** derived from existing `vayo_environments` entries (no new
+  UI needed — reuses the Environments management modal already built).
+  `compile()` gained an optional `CompileOptions` third argument
+  (`title`/`description`/`servers`/`pinnedExamplesByVayoId`) that both
+  `GET /api/spec` and `vayo export` populate from the database; omitting it
+  entirely reproduces the exact prior default behavior.
+- A pre-launch business-logic review (2026-07), specifically checking this
+  session's own additions against real-world usage and against
+  Swagger/Postman feature parity — found and fixed three real issues, not
+  just cosmetic ones:
+  - **A genuine data-loss bug**: `mergeStaticResult` was overwriting
+    `responseSchemas[status]` wholesale on every rescan for a
+    `@response`-declared status, discarding any field real traffic had
+    since taught it. Unlike `requestSchema` (where Zod's own request
+    validation means runtime traffic can never reveal a field the schema
+    didn't declare, so a flat overwrite there loses nothing in practice),
+    nothing validates *outgoing* responses — a handler routinely returns
+    computed/joined fields no request-validation schema ever declared.
+    Reproduced with a failing test first, then fixed by merging via the
+    same genson-js union `mergeCapturedSample` already uses
+    (`mergeDeclaredResponseSchemas`), not a flat overwrite.
+  - **Pinned examples never reached the OpenAPI-format export** — the
+    Postman export already filtered `vayo_examples` to `pinned: true` and
+    included them; `/api/spec`/`vayo export --format openapi` never did.
+    Now both formats are consistent (`CompileOptions.pinnedExamplesByVayoId`,
+    each example named after its own `label`).
+  - **File uploads (`format: "binary"`, multer) were still wrapped in
+    `application/json`** in the exported spec instead of
+    `multipart/form-data` — non-compliant enough to mislead a code
+    generator or Postman import into rendering a text field instead of a
+    file picker for an already-supported code path. Fixed in the compiler
+    and in four UI call sites that hardcoded the `application/json` content
+    key, via one shared `requestBodySchema()` helper.
+  - Noted but **not fixed in this pass**: the Postman export has the same
+    file-upload mislabeling (always `raw`/JSON body) — same bug class,
+    lower urgency since Postman doesn't spec-validate the way OpenAPI 3.1
+    does. Environments/Settings changes aren't broadcast over Socket.IO —
+    a pre-existing gap (Environments had it before Settings existed), not
+    something this pass introduced.
 
 ## Explicitly deferred past v1
 

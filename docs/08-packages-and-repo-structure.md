@@ -103,14 +103,17 @@ tested with fixtures before anything else in the system depends on it.
 ## `@vayo/openapi-compiler`
 
 ```typescript
-export function compile(endpoints: ResolvedEndpoint[], version: string): OpenAPIDocument;
+export function compile(endpoints: ResolvedEndpoint[], version: string, options?: CompileOptions): OpenAPIDocument;
 export function validate(doc: OpenAPIDocument): ValidationResult; // via @apidevtools/swagger-parser
 ```
 
 Produces the `x-vayo-*`-annotated OpenAPI 3.1 document described in
 `02-architecture.md`. Never emits an unvalidated document — `compile()` calls
 `validate()` internally and throws on failure rather than silently serving a
-broken spec.
+broken spec. `options` (all fields optional, omitting it entirely reproduces
+the original default behavior) sources `info.title`/`info.description`/
+`servers` from `vayo_settings`/`vayo_environments` — see `03-data-model.md`
+"`vayo_settings`".
 
 ## `@vayo/db-mongo`
 

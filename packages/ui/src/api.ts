@@ -13,6 +13,7 @@ import type {
   FlowDoc,
   FolderDoc,
   NotificationDoc,
+  SettingsDoc,
   TeamRole,
   TestScriptDoc,
 } from "@vayo/types";
@@ -307,6 +308,15 @@ export const api = {
     request<void>(config, `/api/endpoints/${encodeURIComponent(vayoId)}/deprecated`, {
       method: "PATCH",
       body: JSON.stringify({ deprecated, reason: reason ?? null }),
+    }),
+
+  // ---- project-wide settings (title/description shown in the exported spec) ----
+  getSettings: (config: ApiConfig) => request<SettingsDoc>(config, "/api/settings"),
+
+  updateSettings: (config: ApiConfig, patch: Partial<{ title: string; description: string | null }>) =>
+    request<SettingsDoc>(config, "/api/settings", {
+      method: "PATCH",
+      body: JSON.stringify(patch),
     }),
 
   // ---- environments ----
