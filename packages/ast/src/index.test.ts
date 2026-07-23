@@ -417,6 +417,26 @@ describe("extractDeclaredResponseSchemas", () => {
     });
   });
 
+  it("resolves a schema declared inside a createApp()-style wrapping function, not just at the file's top level", () => {
+    const call = firstRouteRegistration(`
+      function createApp() {
+        const OrderSchema = z.object({ id: z.string(), total: z.number() });
+        /**
+         * @vayo
+         * @response 200 OrderSchema
+         */
+        router.get("/orders/:id", (req, res) => res.json({}));
+      }
+    `);
+    expect(extractDeclaredResponseSchemas(call)).toEqual({
+      "200": {
+        type: "object",
+        properties: { id: { type: "string" }, total: { type: "number" } },
+        required: ["id", "total"],
+      },
+    });
+  });
+
   it("resolves multiple @response lines, one per status code", () => {
     const call = firstRouteRegistration(`
       const OrderSchema = z.object({ id: z.string() });
