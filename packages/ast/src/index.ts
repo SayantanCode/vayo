@@ -627,11 +627,21 @@ function resolveIdentifierDeclarationInitializer(node: Node): Node | null {
  * located here by name first. Returns null (never guesses) when `name`
  * doesn't resolve to a real Zod schema through any of the three. */
 function findSchemaByName(sourceFile: SourceFile, name: string): JSONSchema | null {
-  const localVar = sourceFile.getVariableDeclaration(name);
-  if (localVar) {
-    const init = localVar.getInitializer();
-    const schema = init ? zodExpressionToField(init)?.schema : undefined;
-    if (schema) return schema;
+  // Deliberately a descendant search, not `sourceFile.getVariableDeclaration`/
+  // `getVariableDeclarations()` — those only ever see declarations directly
+  // at the file's top level, missing the extremely common real-world case
+  // of a schema declared inside a `createApp()`-style factory function
+  // (this project's own demo app and CLI-generated scaffold both use
+  // exactly that shape) — confirmed empirically, not an assumption.
+  const allVarDecls = sourceFile.getDescendantsOfKind(SyntaxKind.VariableDeclaration);
+
+  for (const varDecl of allVarDecls) {
+    const nameNode = varDecl.getNameNode();
+    if (Node.isIdentifier(nameNode) && nameNode.getText() === name) {
+      const init = varDecl.getInitializer();
+      const schema = init ? zodExpressionToField(init)?.schema : undefined;
+      if (schema) return schema;
+    }
   }
 
   for (const imp of sourceFile.getImportDeclarations()) {
@@ -642,7 +652,7 @@ function findSchemaByName(sourceFile: SourceFile, name: string): JSONSchema | nu
     if (schema) return schema;
   }
 
-  for (const varDecl of sourceFile.getVariableDeclarations()) {
+  for (const varDecl of allVarDecls) {
     const nameNode = varDecl.getNameNode();
     if (!Node.isObjectBindingPattern(nameNode)) continue;
     for (const element of nameNode.getElements()) {
