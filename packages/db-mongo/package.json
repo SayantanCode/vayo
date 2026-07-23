@@ -1,7 +1,6 @@
 {
   "name": "@vayo/db-mongo",
   "version": "0.1.0",
-  "private": true,
   "license": "MIT",
   "description": "MongoDB implementation of VayoDbAdapter (native driver, not Mongoose) plus vayo init migrations. Implements the BYODB layer.",
   "repository": {
