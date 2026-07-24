@@ -640,6 +640,24 @@ describe("resolveEndpoint", () => {
     expect(resolved.overridden).toEqual(["summary"]);
   });
 
+  it("backfills declaredResponseStatuses/declaredExamples/description when missing entirely, not just null — a real document from before these fields existed, never since rescanned", () => {
+    const endpoint = endpointFixture();
+    // Simulate exactly what a pre-existing MongoDB document looks like when
+    // read back and cast to EndpointDoc: the fields are absent from the
+    // object, not merely `null` — `delete` (rather than `= undefined`)
+    // because a `{key: undefined}` property still satisfies `"key" in obj`
+    // the same way a real missing Mongo field wouldn't.
+    const raw = { ...endpoint } as Partial<EndpointDoc>;
+    delete raw.declaredResponseStatuses;
+    delete raw.declaredExamples;
+    delete raw.description;
+
+    const resolved = resolveEndpoint(raw as EndpointDoc, []);
+    expect(resolved.declaredResponseStatuses).toEqual([]);
+    expect(resolved.declaredExamples).toEqual({});
+    expect(resolved.description).toBeNull();
+  });
+
   it("ignores overrides targeting a different vayoId", () => {
     const endpoint = endpointFixture();
     const override: OverrideDoc = {
