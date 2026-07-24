@@ -35,7 +35,8 @@ import { CreateFolderModal } from "./components/CreateFolderModal.js";
 import { CreateEndpointModal, type ManualEndpointInput } from "./components/CreateEndpointModal.js";
 import { EndpointHeader } from "./components/EndpointHeader.js";
 import { NotificationBell } from "./components/NotificationBell.js";
-import { SettingsModal } from "./components/SettingsModal.js";
+import { SettingsModal, type SettingsPatch } from "./components/SettingsModal.js";
+import { ConfirmModal } from "./components/ConfirmModal.js";
 import { TabBar } from "./components/TabBar.js";
 import { DetailsTab } from "./components/tabs/DetailsTab.js";
 import { FlowmapTab } from "./components/tabs/FlowmapTab.js";
@@ -95,7 +96,14 @@ export function DocsApp({
   renderFlowmap: CustomFlowmap,
   renderHistory: CustomHistory,
 }: DocsAppProps): JSX.Element {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_STORAGE_KEY));
+  // "Remember this device" (LoginScreen) decides which storage the token
+  // lands in: localStorage survives closing the browser entirely,
+  // sessionStorage is cleared the moment this tab/window closes. Checking
+  // both here means either kind of prior session is picked up on load.
+  const [token, setToken] = useState<string | null>(
+    () => localStorage.getItem(TOKEN_STORAGE_KEY) ?? sessionStorage.getItem(TOKEN_STORAGE_KEY),
+  );
+  const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
   const [me, setMe] = useState<CurrentMember | null>(null);
   const [doc, setDoc] = useState<OpenApiDoc | null>(null);
   const [folders, setFolders] = useState<FolderDoc[]>([]);
@@ -190,7 +198,7 @@ export function DocsApp({
     setSettings(await api.getSettings(config));
   }
 
-  async function handleUpdateSettings(patch: { title: string; description: string | null }) {
+  async function handleUpdateSettings(patch: SettingsPatch) {
     setSettings(await api.updateSettings(config, patch));
   }
 
@@ -244,8 +252,14 @@ export function DocsApp({
   }
 
   async function handleCreateApiVersion(newVersion: string, basePathPattern: string) {
-    await api.createApiVersion(config, newVersion, basePathPattern);
-    await refetchApiVersions();
+    try {
+      await api.createApiVersion(config, newVersion, basePathPattern);
+      await refetchApiVersions();
+      setError(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to create API version");
+      throw err;
+    }
   }
 
   async function handleUpdateApiVersionStatus(targetVersion: string, status: ApiVersionStatus) {
@@ -378,8 +392,14 @@ export function DocsApp({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  function handleLogin(newToken: string, member: CurrentMember) {
-    localStorage.setItem(TOKEN_STORAGE_KEY, newToken);
+  function handleLogin(newToken: string, member: CurrentMember, remember: boolean) {
+    if (remember) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, newToken);
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    } else {
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, newToken);
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
     setToken(newToken);
     setMe(member);
   }
@@ -387,6 +407,7 @@ export function DocsApp({
   function handleLogout() {
     api.logout(config).catch(() => {});
     localStorage.removeItem(TOKEN_STORAGE_KEY);
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
     setToken(null);
     setMe(null);
     setDoc(null);
@@ -658,7 +679,7 @@ export function DocsApp({
             </span>
             <span className={`role-badge role-badge--${me.role}`}>{me.role}</span>
           </button>
-          <button type="button" className="button" onClick={handleLogout}>
+          <button type="button" className="button" onClick={() => setSignOutConfirmOpen(true)}>
             Sign out
           </button>
         </div>
@@ -707,6 +728,7 @@ export function DocsApp({
               canEdit={canEdit}
               onTryIt={tryItFromFullDoc}
               onSectionInView={setSelectedVayoId}
+              settings={settings}
             />
           )}
           {viewMode === "endpoint" && !selected && (
@@ -820,6 +842,19 @@ export function DocsApp({
           canEdit={canEdit}
           onSave={handleUpdateSettings}
           onClose={() => setSettingsModalOpen(false)}
+        />
+      )}
+
+      {signOutConfirmOpen && (
+        <ConfirmModal
+          title="Sign out?"
+          message="You'll need to sign in again to get back to your docs."
+          confirmLabel="Sign out"
+          onCancel={() => setSignOutConfirmOpen(false)}
+          onConfirm={() => {
+            setSignOutConfirmOpen(false);
+            handleLogout();
+          }}
         />
       )}
 

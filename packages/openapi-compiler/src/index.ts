@@ -81,7 +81,14 @@ export const X_VAYO_RESPONSE_SCHEMA_DECLARED_STATUSES = "x-vayo-response-schema-
 
 export interface OpenAPIDocument {
   openapi: "3.1.0";
-  info: { title: string; version: string; description?: string };
+  info: {
+    title: string;
+    version: string;
+    description?: string;
+    contact?: { name?: string; email?: string; url?: string };
+    license?: { name: string; url?: string };
+    termsOfService?: string;
+  };
   /** OpenAPI's own standard field, populated from Vayo's own Environments
    * (docs/03-data-model.md `vayo_environments`) rather than a separate
    * concept — each environment with a `baseUrl` variable becomes one
@@ -115,6 +122,9 @@ export interface ValidationResult {
 export interface CompileOptions {
   title?: string;
   description?: string;
+  contact?: { name?: string; email?: string; url?: string };
+  license?: { name: string; url?: string };
+  termsOfService?: string;
   servers?: Array<{ url: string; description?: string }>;
   /** Pinned/saved examples (`vayo_examples`, `pinned: true`) keyed by
    * `vayoId` — compiled into each response's `examples` field alongside
@@ -410,6 +420,21 @@ function buildDocument(endpoints: ResolvedEndpoint[], version: string, options: 
     paths,
   };
   if (options.description) doc.info.description = options.description;
+  if (options.contact && (options.contact.name || options.contact.email || options.contact.url)) {
+    doc.info.contact = options.contact;
+  }
+  // OpenAPI 3.1's License Object requires `name` AND (`identifier` — an SPDX
+  // expression — OR `url`); a name with neither fails schema validation
+  // outright ("must match exactly one schema in oneOf"), found the hard way
+  // against a real settings value ("Proprietary", no URL) that took down
+  // the whole compiled spec. Vayo's settings only ever collect a URL, never
+  // an SPDX identifier (a human-typed license name like "Proprietary" has no
+  // SPDX equivalent to offer), so a name with no URL is silently dropped
+  // here instead — better than the alternative of `compile()` (and every
+  // route/CLI command that calls it) throwing over a Settings field most
+  // people would assume is purely descriptive.
+  if (options.license?.name && options.license.url) doc.info.license = options.license;
+  if (options.termsOfService) doc.info.termsOfService = options.termsOfService;
   if (options.servers && options.servers.length > 0) doc.servers = options.servers;
   if (seenTags.size > 0) {
     doc.tags = [...seenTags].map((name) => ({ name }));

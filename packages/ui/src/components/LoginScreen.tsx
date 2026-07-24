@@ -4,12 +4,13 @@ import type { CurrentMember } from "../types.js";
 
 interface LoginScreenProps {
   baseUrl: string;
-  onLogin: (token: string, member: CurrentMember) => void;
+  onLogin: (token: string, member: CurrentMember, remember: boolean) => void;
 }
 
 export function LoginScreen({ baseUrl, onLogin }: LoginScreenProps): JSX.Element {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -18,8 +19,8 @@ export function LoginScreen({ baseUrl, onLogin }: LoginScreenProps): JSX.Element
     setLoading(true);
     setError(null);
     try {
-      const result = await api.login({ baseUrl, token: null }, email, password);
-      onLogin(result.token, result.member);
+      const result = await api.login({ baseUrl, token: null }, email, password, remember);
+      onLogin(result.token, result.member, remember);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not reach the Vayo server.");
     } finally {
@@ -54,6 +55,10 @@ export function LoginScreen({ baseUrl, onLogin }: LoginScreenProps): JSX.Element
             autoComplete="current-password"
             required
           />
+        </label>
+        <label className="login-card__remember">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+          <span>Remember this device</span>
         </label>
         <button type="submit" className="button button--primary" disabled={loading}>
           {loading ? "Signing in…" : "Sign in"}

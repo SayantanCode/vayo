@@ -54,13 +54,40 @@ export function createFakeDb(): VayoDbAdapter {
 
   return {
     async getSettings() {
-      return settings ?? { _id: "", title: "Vayo API", description: null, updatedBy: "", updatedAt: "" };
+      return (
+        settings ?? {
+          _id: "",
+          title: "Vayo API",
+          description: null,
+          contactName: null,
+          contactEmail: null,
+          contactUrl: null,
+          licenseName: null,
+          licenseUrl: null,
+          termsOfService: null,
+          updatedBy: "",
+          updatedAt: "",
+        }
+      );
     },
     async updateSettings(patch, updatedBy) {
+      function field<K extends "description" | "contactName" | "contactEmail" | "contactUrl" | "licenseName" | "licenseUrl" | "termsOfService">(
+        key: K,
+        patchValue: string | null | undefined,
+      ): string | null {
+        if (patchValue !== undefined) return patchValue;
+        return settings?.[key] ?? null;
+      }
       settings = {
         _id: settings?._id || genId("settings"),
         title: patch.title ?? settings?.title ?? "Vayo API",
-        description: patch.description !== undefined ? patch.description : (settings?.description ?? null),
+        description: field("description", patch.description),
+        contactName: field("contactName", patch.contactName),
+        contactEmail: field("contactEmail", patch.contactEmail),
+        contactUrl: field("contactUrl", patch.contactUrl),
+        licenseName: field("licenseName", patch.licenseName),
+        licenseUrl: field("licenseUrl", patch.licenseUrl),
+        termsOfService: field("termsOfService", patch.termsOfService),
         updatedBy,
         updatedAt: new Date().toISOString(),
       };
@@ -519,6 +546,9 @@ export function createFakeDb(): VayoDbAdapter {
     },
 
     async createApiVersion(apiVersion) {
+      if (apiVersions.has(apiVersion.version)) {
+        throw new Error(`API version "${apiVersion.version}" already exists.`);
+      }
       const id = genId("ver");
       const saved = { _id: id, ...apiVersion };
       apiVersions.set(apiVersion.version, saved);

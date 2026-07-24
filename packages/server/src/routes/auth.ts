@@ -13,9 +13,13 @@ import type { RouteDeps } from "../server-deps.js";
 const loginBodySchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  // "Remember this device" (LoginScreen) — defaults true so existing/older
+  // clients that never send this field keep today's behavior exactly.
+  remember: z.boolean().optional().default(true),
 });
 
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const REMEMBERED_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const UNREMEMBERED_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
 export function createAuthRouter({ db, sessionSecret, authMiddleware }: RouteDeps, authRateLimiter: RequestHandler): Router {
   const router = autoCatchAsyncErrors(Router());
@@ -43,7 +47,8 @@ export function createAuthRouter({ db, sessionSecret, authMiddleware }: RouteDep
     }
     const rawToken = randomBytes(32).toString("hex");
     const tokenHash = hashToken(rawToken, sessionSecret);
-    const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+    const ttlMs = parsed.data.remember ? REMEMBERED_SESSION_TTL_MS : UNREMEMBERED_SESSION_TTL_MS;
+    const expiresAt = new Date(Date.now() + ttlMs).toISOString();
     await db.createSession({ memberId: member._id, tokenHash, expiresAt });
     // The raw token is returned exactly once, here — only its hash is ever
     // stored (docs/05-security.md §5).

@@ -858,16 +858,43 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
     async getSettings(): Promise<SettingsDoc> {
       const db = await getDb();
       const raw = await db.collection(COLLECTIONS.settings).findOne({});
-      if (!raw) return { _id: "", title: "Vayo API", description: null, updatedBy: "", updatedAt: "" };
-      return fromMongo<SettingsDoc>(raw);
+      const empty: Omit<SettingsDoc, "_id"> = {
+        title: "Vayo API",
+        description: null,
+        contactName: null,
+        contactEmail: null,
+        contactUrl: null,
+        licenseName: null,
+        licenseUrl: null,
+        termsOfService: null,
+        updatedBy: "",
+        updatedAt: "",
+      };
+      if (!raw) return { _id: "", ...empty };
+      // Backfills fields added to SettingsDoc after this document was last
+      // written (same reasoning as resolveEndpoint's own backfill,
+      // @vayo/schema-engine) — a real, reachable case for any install
+      // upgrading to a version with these newer fields, until settings are
+      // next saved through the UI.
+      return { ...empty, ...fromMongo<SettingsDoc>(raw) };
     },
 
     async updateSettings(patch, updatedBy): Promise<SettingsDoc> {
       const db = await getDb();
       const existing = await db.collection(COLLECTIONS.settings).findOne({});
+      function field<K extends string>(key: K, patchValue: string | null | undefined): string | null {
+        if (patchValue !== undefined) return patchValue;
+        return (existing?.[key] as string | null | undefined) ?? null;
+      }
       const next = {
         title: patch.title ?? (existing?.title as string | undefined) ?? "Vayo API",
-        description: patch.description !== undefined ? patch.description : ((existing?.description as string | null | undefined) ?? null),
+        description: field("description", patch.description),
+        contactName: field("contactName", patch.contactName),
+        contactEmail: field("contactEmail", patch.contactEmail),
+        contactUrl: field("contactUrl", patch.contactUrl),
+        licenseName: field("licenseName", patch.licenseName),
+        licenseUrl: field("licenseUrl", patch.licenseUrl),
+        termsOfService: field("termsOfService", patch.termsOfService),
         updatedBy,
         updatedAt: new Date().toISOString(),
       };
@@ -990,7 +1017,17 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
 
     async createApiVersion(apiVersion: Omit<ApiVersionDoc, "_id">): Promise<ApiVersionDoc> {
       const db = await getDb();
-      const result = await db.collection(COLLECTIONS.apiVersions).insertOne(apiVersion);
+      const col = db.collection(COLLECTIONS.apiVersions);
+      // Pre-check for a friendly error, same reasoning as createManualEndpoint
+      // above: the unique index on `version` (runMigrations) is the real
+      // guarantee, but a raw duplicate-key error is a technical, Mongo-specific
+      // message not fit to show a user — this is what actually surfaces at
+      // the route (versions.ts), a clean 409 either way.
+      const existing = await col.findOne({ version: apiVersion.version });
+      if (existing) {
+        throw new Error(`API version "${apiVersion.version}" already exists.`);
+      }
+      const result = await col.insertOne(apiVersion);
       return { ...apiVersion, _id: result.insertedId.toString() };
     },
 

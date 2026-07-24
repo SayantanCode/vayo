@@ -59,10 +59,10 @@ async function request<T>(config: ApiConfig, path: string, init?: RequestInit): 
 }
 
 export const api = {
-  login: (config: ApiConfig, email: string, password: string) =>
+  login: (config: ApiConfig, email: string, password: string, remember = true) =>
     request<{ token: string; expiresAt: string; member: CurrentMember }>(config, "/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, remember }),
     }),
 
   logout: (config: ApiConfig) => request<void>(config, "/api/auth/logout", { method: "POST" }),
@@ -313,7 +313,19 @@ export const api = {
   // ---- project-wide settings (title/description shown in the exported spec) ----
   getSettings: (config: ApiConfig) => request<SettingsDoc>(config, "/api/settings"),
 
-  updateSettings: (config: ApiConfig, patch: Partial<{ title: string; description: string | null }>) =>
+  updateSettings: (
+    config: ApiConfig,
+    patch: Partial<{
+      title: string;
+      description: string | null;
+      contactName: string | null;
+      contactEmail: string | null;
+      contactUrl: string | null;
+      licenseName: string | null;
+      licenseUrl: string | null;
+      termsOfService: string | null;
+    }>,
+  ) =>
     request<SettingsDoc>(config, "/api/settings", {
       method: "PATCH",
       body: JSON.stringify(patch),

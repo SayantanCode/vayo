@@ -78,6 +78,41 @@ describe("compile", () => {
     expect(doc.info.title).toBe("Vayo API");
   });
 
+  it("includes contact/license/termsOfService when given, omitting each independently when not", async () => {
+    const withAll = await compile([endpoint()], "v1", {
+      contact: { name: "API Team", email: "api@example.com" },
+      license: { name: "MIT", url: "https://opensource.org/licenses/MIT" },
+      termsOfService: "https://example.com/terms",
+    });
+    expect(withAll.info.contact).toEqual({ name: "API Team", email: "api@example.com" });
+    expect(withAll.info.license).toEqual({ name: "MIT", url: "https://opensource.org/licenses/MIT" });
+    expect(withAll.info.termsOfService).toBe("https://example.com/terms");
+
+    const withNone = await compile([endpoint()], "v1", {});
+    expect(withNone.info.contact).toBeUndefined();
+    expect(withNone.info.license).toBeUndefined();
+    expect(withNone.info.termsOfService).toBeUndefined();
+  });
+
+  it("drops a license with no name, since OpenAPI's License Object requires one", async () => {
+    const doc = await compile([endpoint()], "v1", { license: { name: "", url: "https://example.com" } as never });
+    expect(doc.info.license).toBeUndefined();
+  });
+
+  it("drops a license with a name but no URL, rather than producing a document that fails its own OpenAPI 3.1 validation", async () => {
+    // OpenAPI 3.1's License Object requires `name` AND (`identifier` OR
+    // `url`) — a name-only license (e.g. "Proprietary", freely typeable in
+    // the Settings UI with no URL) fails schema validation outright if
+    // emitted as-is. This is the actual real-world case that surfaced the
+    // bug: compile() must never throw over a Settings field a user assumed
+    // was purely descriptive.
+    const doc = await compile([endpoint()], "v1", { license: { name: "Proprietary" } });
+    expect(doc.info.license).toBeUndefined();
+    // Confirms the document is still valid overall, not just that this one
+    // field was dropped — the actual failure mode was compile() throwing.
+    await expect(compile([endpoint()], "v1", { license: { name: "Proprietary" } })).resolves.toBeDefined();
+  });
+
   it("produces a document that validates as OpenAPI 3.1 for a realistic endpoint set", async () => {
     const endpoints: ResolvedEndpoint[] = [
       endpoint({
