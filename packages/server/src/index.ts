@@ -193,7 +193,21 @@ export function createServer(options: ServerOptions): VayoServerHandle {
           styleSrc: ["'self'", "'unsafe-inline'"],
           imgSrc: ["'self'", "data:"],
           fontSrc: ["'self'", "data:"],
-          connectSrc: ["'self'"],
+          // Deliberately unrestricted, unlike every other directive here:
+          // Try It Now (`packages/ui`'s TryItNowTab) sends a real browser
+          // `fetch()` straight to whatever base URL the active environment
+          // resolves to — almost always a different origin than this docs
+          // server itself (a different port in dev, a different subdomain
+          // in prod). `'self'` here would make the browser's own CSP block
+          // every one of those requests outright, regardless of whether the
+          // target API's CORS would have allowed it — silently breaking the
+          // feature for every deployment except the one narrow case where
+          // the user's real API happens to be served from this exact origin.
+          // The primary anti-exfiltration defense is `script-src` above (no
+          // injected script can run in the first place); connect-src can't
+          // usefully allow-list these origins in advance since they're
+          // whatever base URL a team adds to their own Environments later.
+          connectSrc: ["*"],
           objectSrc: ["'none'"],
           baseUri: ["'self'"],
           frameAncestors: ["'self'"],
