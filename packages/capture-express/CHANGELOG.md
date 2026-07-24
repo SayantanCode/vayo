@@ -1,5 +1,14 @@
 # @vayo/capture-express
 
+## 0.1.1-beta.1
+
+### Patch Changes
+
+- Updated dependencies [c8cd29c]
+- Updated dependencies [4a677a6]
+  - @vayo/types@0.1.1-beta.1
+  - @vayo/schema-engine@0.1.1-beta.1
+
 ## 0.1.1-beta.0
 
 ### Patch Changes

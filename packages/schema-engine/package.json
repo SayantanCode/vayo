@@ -1,6 +1,6 @@
 {
   "name": "@vayo/schema-engine",
-  "version": "0.1.1-beta.0",
+  "version": "0.1.1-beta.1",
   "license": "MIT",
   "description": "Framework-agnostic schema inference/merge (genson-js) and the pure override-resolution function. No Express, no MongoDB.",
   "repository": {
