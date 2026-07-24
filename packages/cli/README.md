@@ -74,7 +74,8 @@ client.
 |---|---|
 | `vayo init` | One-time setup: `.env`, `vayo.config.js`, AST-entry file, DB migrations |
 | `vayo scan` | Static AST pass — routes, middleware, auth guesses, request schemas (Zod- or Mongoose-derived) |
-| `vayo export` | Compile and write the resolved OpenAPI 3.1 (or Postman) spec for a version |
+| `vayo export` | Compile and write the resolved spec for a version — `--format openapi` (default) or `--format postman` |
+| `vayo import <file>` | Enrich already-discovered endpoints with descriptions/examples/servers from an existing OpenAPI 3.0.x/3.1 spec — `--version`, `--overwrite`. Never invents endpoints from the spec; capture/scan stay the source of truth for what exists. Rejects a Postman Collection export with a clear error (different shape, not yet supported here) |
 | `vayo create-owner` | Create the first team member (owner role) — the only way in for standalone auth |
 | `vayo serve` | Run the REST API + Socket.IO gateway + docs UI standalone |
 | `vayo diff <from> <to>` | Structural diff between two API versions — `--fail-on-breaking` for CI |

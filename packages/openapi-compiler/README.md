@@ -13,14 +13,33 @@ speaks that format.
 import { compile, validate } from "@vayo/openapi-compiler";
 
 const doc = await compile(resolvedEndpoints, "v1"); // throws if the result wouldn't validate
+
+// Optional third argument fills in info.title/description and servers[] —
+// mirrors swagger-jsdoc's options.definition.info/servers. Left out
+// entirely, compile() falls back to "Vayo API", no description, no servers.
+await compile(resolvedEndpoints, "v1", {
+  title: "Acme API",
+  description: "Internal order-management API.",
+  servers: [{ url: "https://api.acme.com", description: "Production" }],
+});
 ```
 
-Also exports `diffSpecs(specA, specB)` — the structural diff behind `vayo
-diff` (added/removed operations, added/removed *required* fields, type
-changes, enum changes).
+Other exports:
+
+- `diffSpecs(specA, specB)` — the structural diff behind `vayo diff`
+  (added/removed operations, added/removed *required* fields, type changes,
+  enum changes).
+- `planOpenApiImport(spec, existingEndpoints, existingEnvironments)` — pure
+  planning function behind `vayo import`: reads an existing OpenAPI 3.0.x/3.1
+  document and matches its operations/examples/servers against endpoints
+  Vayo already knows about, returning a plan of description/example
+  overrides and new environment candidates to write — no I/O itself. Throws
+  if the input looks like a Postman Collection export instead (a distinct,
+  not-yet-built import path).
 
 Most people use this via
-[`vayo export`](https://www.npmjs.com/package/vayo), not directly.
+[`vayo export`](https://www.npmjs.com/package/vayo) /
+`vayo import`, not directly.
 
 ## License
 
