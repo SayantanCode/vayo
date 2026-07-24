@@ -119,4 +119,14 @@ describe("static UI serving (@vayo/ui's built bundle, dist-app/)", () => {
     expect(assetRes.status).toBe(200);
     expect(assetRes.type).toBe("application/javascript");
   });
+
+  it("does not restrict connect-src, unlike every other CSP directive — Try It Now needs the browser to fetch arbitrary, user-configured cross-origin API URLs, which a 'self'-only connect-src would silently block regardless of the target's own CORS config", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/vayo" });
+
+    const res = await request(app).get("/vayo/").set("Accept", "text/html");
+    const csp = res.headers["content-security-policy"];
+    expect(csp).toContain("connect-src *");
+    expect(csp).not.toContain("connect-src 'self'");
+  });
 });

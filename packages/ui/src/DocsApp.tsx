@@ -281,7 +281,9 @@ export function DocsApp({
 
   useEffect(() => {
     if (!token) return;
-    refetchSpecAndFolders().catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load spec"));
+    refetchSpecAndFolders()
+      .then(() => setError(null))
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load spec"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, token, activeVersion]);
 
