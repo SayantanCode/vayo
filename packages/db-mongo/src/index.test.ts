@@ -1063,4 +1063,50 @@ describe("createAdapter — settings", () => {
     const settings = await adapter.getSettings();
     expect(settings.description).toBeNull();
   });
+
+  it("persists contact/license/termsOfService independently of title/description, defaulting the rest to null", async () => {
+    await adapter.updateSettings({ contactName: "API Team", contactEmail: "api@example.com" }, "member_1");
+    const settings = await adapter.getSettings();
+    expect(settings).toMatchObject({
+      title: "Vayo API",
+      contactName: "API Team",
+      contactEmail: "api@example.com",
+      contactUrl: null,
+      licenseName: null,
+      licenseUrl: null,
+      termsOfService: null,
+    });
+
+    await adapter.updateSettings({ licenseName: "MIT", licenseUrl: "https://opensource.org/licenses/MIT" }, "member_1");
+    const withLicense = await adapter.getSettings();
+    expect(withLicense).toMatchObject({
+      contactName: "API Team",
+      licenseName: "MIT",
+      licenseUrl: "https://opensource.org/licenses/MIT",
+    });
+  });
+
+  it("backfills contact/license/termsOfService for a settings document saved before these fields existed", async () => {
+    // Simulates a real pre-existing vayo_settings document from before this
+    // fields were added — written directly, not through updateSettings, so
+    // it genuinely lacks the keys entirely (not just null), the same
+    // "old document missing a new field" scenario resolveEndpoint
+    // (@vayo/schema-engine) already handles for EndpointDoc.
+    await client
+      .db()
+      .collection(COLLECTIONS.settings)
+      .insertOne({ title: "Legacy API", description: "From before this session.", updatedBy: "member_1", updatedAt: new Date().toISOString() });
+
+    const settings = await adapter.getSettings();
+    expect(settings).toMatchObject({
+      title: "Legacy API",
+      description: "From before this session.",
+      contactName: null,
+      contactEmail: null,
+      contactUrl: null,
+      licenseName: null,
+      licenseUrl: null,
+      termsOfService: null,
+    });
+  });
 });

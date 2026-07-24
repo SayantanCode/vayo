@@ -33,9 +33,18 @@ async function compileOptionsFromDb(db: VayoDbAdapter, resolved: ResolvedEndpoin
     }),
   );
 
+  const contact =
+    settings.contactName || settings.contactEmail || settings.contactUrl
+      ? { name: settings.contactName ?? undefined, email: settings.contactEmail ?? undefined, url: settings.contactUrl ?? undefined }
+      : undefined;
+  const license = settings.licenseName ? { name: settings.licenseName, url: settings.licenseUrl ?? undefined } : undefined;
+
   return {
     title: settings.title,
     description: settings.description ?? undefined,
+    contact,
+    license,
+    termsOfService: settings.termsOfService ?? undefined,
     servers,
     pinnedExamplesByVayoId,
   };
@@ -81,14 +90,18 @@ export function createVersionsRouter({ db, io }: RouteDeps): Router {
       res.status(400).json({ error: "invalid body", details: parsed.error.issues });
       return;
     }
-    const created = await db.createApiVersion({
-      version: parsed.data.version,
-      basePathPattern: parsed.data.basePathPattern,
-      status: "active",
-      deprecatedAt: null,
-      sunsetAt: null,
-    });
-    res.status(201).json(created);
+    try {
+      const created = await db.createApiVersion({
+        version: parsed.data.version,
+        basePathPattern: parsed.data.basePathPattern,
+        status: "active",
+        deprecatedAt: null,
+        sunsetAt: null,
+      });
+      res.status(201).json(created);
+    } catch (err) {
+      res.status(409).json({ error: err instanceof Error ? err.message : "conflict" });
+    }
   });
 
   router.patch("/api/versions/:version", requireRole("editor"), async (req: VayoAuthedRequest, res) => {

@@ -10,7 +10,7 @@
 // (DocsApp.tsx makes clicking an endpoint here scroll to it instead of
 // switching the selected endpoint, while this mode is active).
 import { useEffect, useMemo, useRef } from "react";
-import type { EnvironmentDoc, FolderDoc } from "@vayo/types";
+import type { EnvironmentDoc, FolderDoc, SettingsDoc } from "@vayo/types";
 import { flattenTree, type TreeNode } from "../types.js";
 import { EndpointHeader } from "./EndpointHeader.js";
 import { DetailsTab } from "./tabs/DetailsTab.js";
@@ -25,6 +25,14 @@ interface FullDocViewProps {
   onSelectEnvironment: (id: string | null) => void;
   onManageEnvironments: () => void;
   canEdit: boolean;
+  /** Project Settings' title/description — shown once at the top of this
+   * page, the same "info block above the operation list" every third-party
+   * OpenAPI renderer (Redoc, Swagger UI) already does with the identical
+   * `info.title`/`info.description` fields. This is the only place in the
+   * docs UI a saved description is ever actually rendered — until now it
+   * only ever reached the exported spec's JSON, with no visible surface at
+   * all in the app itself. */
+  settings: SettingsDoc | null;
   /** Jumps to that endpoint in the normal (interactive) workspace, on its
    * Try It Now tab — leaving this read-only view, since sending a real
    * request isn't something a static reference page can do in place. */
@@ -48,6 +56,7 @@ export function FullDocView({
   canEdit,
   onTryIt,
   onSectionInView,
+  settings,
 }: FullDocViewProps): JSX.Element {
   // Every folder "expanded" — this view is a linear printout of the whole
   // tree, not a collapsible one; collapsing belongs to the sidebar's own
@@ -119,6 +128,41 @@ export function FullDocView({
 
   return (
     <div className="full-doc" ref={containerRef}>
+      {settings?.description && (
+        <div className="full-doc__intro">
+          <h1>{settings.title}</h1>
+          <p>{settings.description}</p>
+          {(settings.termsOfService || settings.contactName || settings.contactEmail || settings.licenseName) && (
+            <p className="full-doc__intro-meta muted">
+              {settings.licenseName &&
+                (settings.licenseUrl ? (
+                  <a href={settings.licenseUrl} target="_blank" rel="noreferrer">
+                    {settings.licenseName}
+                  </a>
+                ) : (
+                  settings.licenseName
+                ))}
+              {settings.licenseName && (settings.contactName || settings.contactEmail || settings.termsOfService) && " · "}
+              {(settings.contactName || settings.contactEmail) && (
+                <>
+                  Contact:{" "}
+                  {settings.contactEmail ? (
+                    <a href={`mailto:${settings.contactEmail}`}>{settings.contactName || settings.contactEmail}</a>
+                  ) : (
+                    settings.contactName
+                  )}
+                </>
+              )}
+              {(settings.contactName || settings.contactEmail) && settings.termsOfService && " · "}
+              {settings.termsOfService && (
+                <a href={settings.termsOfService} target="_blank" rel="noreferrer">
+                  Terms of Service
+                </a>
+              )}
+            </p>
+          )}
+        </div>
+      )}
       {rows.map((row) => {
         if (row.node.type === "folder") {
           return (

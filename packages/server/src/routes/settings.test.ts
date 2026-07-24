@@ -50,4 +50,24 @@ describe("settings", () => {
       .send({ description: null });
     expect(cleared.body.description).toBeNull();
   });
+
+  it("accepts contact/license/termsOfService independently, defaulting the rest to null", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+
+    const updated = await request(app)
+      .patch("/api/settings")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ contactName: "API Team", contactEmail: "api@example.com", licenseName: "MIT" });
+    expect(updated.status).toBe(200);
+    expect(updated.body).toMatchObject({
+      contactName: "API Team",
+      contactEmail: "api@example.com",
+      contactUrl: null,
+      licenseName: "MIT",
+      licenseUrl: null,
+      termsOfService: null,
+    });
+  });
 });

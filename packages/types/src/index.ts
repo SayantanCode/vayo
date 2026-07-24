@@ -411,6 +411,20 @@ export interface SettingsDoc {
   _id: string;
   title: string;
   description: string | null;
+  // The rest of OpenAPI's standard `info` object (docs/02-architecture.md) —
+  // same "editable through the docs UI instead of only ever hardcoded"
+  // reasoning as title/description above. All optional/nullable: omitting
+  // everything reproduces today's exported spec exactly (no contact,
+  // license, or termsOfService fields at all).
+  contactName: string | null;
+  contactEmail: string | null;
+  contactUrl: string | null;
+  // OpenAPI's own License Object requires `name` when present at all, but
+  // never requires `url` — matched here as one nullable pair rather than
+  // splitting license into its own required/optional fields.
+  licenseName: string | null;
+  licenseUrl: string | null;
+  termsOfService: string | null;
   updatedBy: string;
   updatedAt: string;
 }
@@ -809,7 +823,19 @@ export interface VayoDbAdapter {
    * every caller (the compiled spec, the UI's settings form) can rely on a
    * value existing without a separate "has this been set up" branch. */
   getSettings(): Promise<SettingsDoc>;
-  updateSettings(patch: { title?: string; description?: string | null }, updatedBy: string): Promise<SettingsDoc>;
+  updateSettings(
+    patch: {
+      title?: string;
+      description?: string | null;
+      contactName?: string | null;
+      contactEmail?: string | null;
+      contactUrl?: string | null;
+      licenseName?: string | null;
+      licenseUrl?: string | null;
+      termsOfService?: string | null;
+    },
+    updatedBy: string,
+  ): Promise<SettingsDoc>;
 
   // -------------------------------------------------------------------------
   // Environments (vayo_environments)

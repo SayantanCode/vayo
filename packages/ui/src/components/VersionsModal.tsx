@@ -32,9 +32,15 @@ export function VersionsModal({ versions, canEdit, onCreate, onUpdateStatus, onC
 
   async function handleCreate() {
     if (!versionInput.trim() || !basePathPatternInput.trim()) return;
-    await onCreate(versionInput.trim(), basePathPatternInput.trim());
-    setVersionInput("");
-    setBasePathPatternInput("");
+    try {
+      await onCreate(versionInput.trim(), basePathPatternInput.trim());
+      setVersionInput("");
+      setBasePathPatternInput("");
+    } catch {
+      // DocsApp's own global error banner already shows the message
+      // (e.g. a duplicate version name) — keep the form's input as-is so
+      // the user can fix it and retry, instead of silently clearing it.
+    }
   }
 
   return (

@@ -10,6 +10,12 @@ import type { RouteDeps } from "../server-deps.js";
 const settingsPatchSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
+  contactName: z.string().nullable().optional(),
+  contactEmail: z.string().nullable().optional(),
+  contactUrl: z.string().nullable().optional(),
+  licenseName: z.string().nullable().optional(),
+  licenseUrl: z.string().nullable().optional(),
+  termsOfService: z.string().nullable().optional(),
 });
 
 export function createSettingsRouter({ db }: RouteDeps): Router {

@@ -17,6 +17,23 @@ describe("api versions + diff + spec", () => {
     expect(list.body[0].version).toBe("v1");
   });
 
+  it("rejects creating a version whose name already exists with a clean 409, not a raw duplicate-key error", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+
+    await request(app).post("/api/versions").set("Authorization", `Bearer ${token}`).send({ version: "v1", basePathPattern: "/api/v1" });
+    const dup = await request(app)
+      .post("/api/versions")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ version: "v1", basePathPattern: "/api/v1-again" });
+
+    expect(dup.status).toBe(409);
+    expect(dup.body.error).toMatch(/already exists/);
+    const list = await request(app).get("/api/versions").set("Authorization", `Bearer ${token}`);
+    expect(list.body).toHaveLength(1);
+  });
+
   it("/api/spec compiles a real OpenAPI document for the version's resolved endpoints", async () => {
     const db = createFakeDb();
     const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
@@ -43,7 +60,15 @@ describe("api versions + diff + spec", () => {
     await request(app)
       .patch("/api/settings")
       .set("Authorization", `Bearer ${editorToken}`)
-      .send({ title: "My Company API", description: "Internal order-management API." });
+      .send({
+        title: "My Company API",
+        description: "Internal order-management API.",
+        contactName: "API Team",
+        contactEmail: "api@example.com",
+        licenseName: "MIT",
+        licenseUrl: "https://opensource.org/licenses/MIT",
+        termsOfService: "https://example.com/terms",
+      });
     await request(app)
       .post("/api/environments")
       .set("Authorization", `Bearer ${editorToken}`)
@@ -54,7 +79,13 @@ describe("api versions + diff + spec", () => {
       .send({ name: "No base URL yet", variables: {} });
 
     const spec = await request(app).get("/api/spec?version=v1").set("Authorization", `Bearer ${token}`);
-    expect(spec.body.info).toMatchObject({ title: "My Company API", description: "Internal order-management API." });
+    expect(spec.body.info).toMatchObject({
+      title: "My Company API",
+      description: "Internal order-management API.",
+      contact: { name: "API Team", email: "api@example.com" },
+      license: { name: "MIT", url: "https://opensource.org/licenses/MIT" },
+      termsOfService: "https://example.com/terms",
+    });
     expect(spec.body.servers).toEqual([{ url: "https://api.example.com", description: "Production" }]);
   });
 

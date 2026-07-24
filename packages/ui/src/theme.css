@@ -2540,6 +2540,19 @@ select:focus {
   font-size: 13px;
 }
 
+.login-card__remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--vayo-text-muted);
+  cursor: pointer;
+}
+
+.login-card__remember input {
+  margin: 0;
+}
+
 /* ---------------------------------------------------------------------- */
 /* Misc                                                                    */
 /* ---------------------------------------------------------------------- */
@@ -3601,6 +3614,8 @@ kbd {
 .modal {
   width: 380px;
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -3614,6 +3629,17 @@ kbd {
 .modal h3 {
   margin: 0;
   font-size: 15px;
+}
+
+.settings-modal__section {
+  margin: 4px 0 -6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vayo-text-muted);
+  border-top: 1px solid var(--vayo-border);
+  padding-top: 12px;
 }
 
 .modal__hint {
