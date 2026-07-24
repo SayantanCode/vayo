@@ -1,6 +1,6 @@
 {
   "name": "@vayo/capture-express",
-  "version": "0.1.1-beta.0",
+  "version": "0.1.1-beta.1",
   "license": "MIT",
   "description": "Express middleware: captures real traffic, redacts sensitive fields, hands samples to @vayo/schema-engine. The only Vayo package allowed to import Express types.",
   "repository": {

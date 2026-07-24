@@ -1,5 +1,83 @@
 # @vayo/ui
 
+## 0.1.1-beta.1
+
+### Patch Changes
+
+- c8cd29c: Several launch-readiness improvements, requested together:
+
+  - **Sign-out now confirms first.** A single click used to sign out
+    immediately; it now opens the same confirm dialog other destructive
+    actions (delete endpoint/folder) already use.
+  - **"Remember this device" on login.** Unchecked, the session token is
+    kept in `sessionStorage` (cleared when the tab/browser closes) instead of
+    `localStorage`, and the server issues a shorter-lived session (24h vs
+    30 days) to match.
+  - **Creating a duplicate API version name failed silently.** `POST
+/api/versions` had a unique index but no pre-check, so a second `v1`
+    threw an uncaught, unhandled 500 with zero UI feedback. Now returns a
+    clean 409 ("API version \"v1\" already exists.") shown in the same
+    global error banner every other create/delete failure already uses, and
+    the form's input is preserved instead of vanishing.
+  - **A saved project description was never shown anywhere in the docs UI**
+    — only in the exported spec's JSON. It's now rendered at the top of
+    Full Docs mode, the same "info block above the operation list" every
+    third-party OpenAPI renderer (Redoc, Swagger UI) already does.
+  - **Project settings gained contact/license/termsOfService** — the rest of
+    OpenAPI's standard `info` object, filling out what was previously just
+    title/description.
+  - **Fixed a real bug found while testing the above**: OpenAPI 3.1's
+    License Object requires `url` (or an SPDX `identifier`) alongside
+    `name` — a license name entered with no URL made the _entire_ compiled
+    spec fail its own validation, breaking `/api/spec` and the whole docs UI
+    outright. `compile()` now silently omits an incomplete license instead
+    of ever producing an invalid document.
+
+- 565de2a: Extended the previous stale-error-banner fix to the two other places
+  `DocsApp` sets the same global error banner: `handleCreateEndpoint` and
+  `handleDeleteEndpoint` now clear it on success too, not just on failure.
+  Previously, a failed create/delete (e.g. a duplicate-path conflict) left
+  its error banner on screen indefinitely, surviving even an unrelated,
+  fully successful action afterward.
+- 13800e0: Fixed two bugs found during an end-to-end UI sweep against a real deployment:
+
+  - **Try It Now was silently broken by the docs server's own CSP.** The
+    `helmet` config set `connectSrc: ["'self'"]`, which makes the browser
+    refuse to even attempt a cross-origin `fetch()` — the docs UI and the
+    actual API being documented are almost always different origins (a
+    different port in dev, a different subdomain in prod). The Try It Now
+    tab's own error hint blamed this on CORS or an unreachable server, since
+    nobody had connected it back to the docs server's own CSP header. `connect-src`
+    is now unrestricted, since the primary anti-exfiltration defense
+    (`script-src`) is unaffected and there's no way to allow-list in advance
+    the arbitrary base URLs a team adds to their own Environments.
+  - **A stale "unauthorized" error banner survived a successful login.**
+    If the browser's stored session token was invalid (e.g. expired, or a
+    session-secret rotation) when the app first loaded, the initial spec/folders
+    fetch would fail and set a persistent error banner — which then never
+    cleared even after the user signed back in and every subsequent fetch
+    succeeded, since nothing reset it on success.
+
+- 15dd8b0: Fixed the header toolbar getting crushed on anything narrower than a very
+  wide desktop. `.docs-app__search-trigger` was the only flexible element
+  (`flex: 1; min-width: 0`) sharing a non-wrapping row with a growing list of
+  fixed-width buttons (Full Docs, Flows, Coverage, Team, Chat, Settings, the
+  theme toggle, notifications, the user menu) — as those accumulated over
+  this session, the search box got squeezed down to showing just "Ctrl" with
+  its own label cut off. The header now wraps onto a second line once it
+  runs out of room, and the search box has a 140px floor so it never shrinks
+  past legibility.
+- 130aa3e: Updated READMEs to document capabilities that had landed in code but never
+  made it into the package docs: `@vayo/ast`'s optional JSDoc tags
+  (`@group`/`@deprecated`/`@response`/`@example`/`@description`),
+  `@vayo/openapi-compiler`'s `compile()` `title`/`description`/`servers`
+  options and `planOpenApiImport`, `@vayo/ui`'s Coverage/Flows/Settings/Chat/
+  Export surfaces, and the `vayo` CLI's `vayo import` command.
+- Updated dependencies [c8cd29c]
+- Updated dependencies [130aa3e]
+  - @vayo/types@0.1.1-beta.1
+  - @vayo/openapi-compiler@0.1.1-beta.1
+
 ## 0.1.1-beta.0
 
 ### Patch Changes

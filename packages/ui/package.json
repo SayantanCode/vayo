@@ -1,6 +1,6 @@
 {
   "name": "@vayo/ui",
-  "version": "0.1.1-beta.0",
+  "version": "0.1.1-beta.1",
   "license": "MIT",
   "description": "Schema-driven React docs UI. Five tabs per endpoint: Details, Flowmap, History, Team Chat, Try It Now (docs/08-packages-and-repo-structure.md).",
   "repository": {

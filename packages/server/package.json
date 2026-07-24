@@ -1,6 +1,6 @@
 {
   "name": "@vayo/server",
-  "version": "0.1.1-beta.0",
+  "version": "0.1.1-beta.1",
   "license": "MIT",
   "description": "REST API + Socket.IO gateway + static UI hosting. Every mutating route is role-checked server-side (docs/05-security.md).",
   "repository": {
