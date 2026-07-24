@@ -2,7 +2,10 @@
 
 Vayo's schema-driven React docs UI — five tabs per endpoint (Details,
 Flowmap, History, Team Chat, Try It Now), plus Team management,
-Notifications, and API version diffing.
+Notifications, Coverage (which endpoints are undocumented/unconfirmed),
+Flows (saved, ordered multi-endpoint sequences), a cross-endpoint Chat
+drawer, per-project Settings (title/description shown in the exported
+spec), OpenAPI/Postman export, and API version diffing.
 
 You won't import this package's code directly.
 [`@vayo/server`](https://www.npmjs.com/package/@vayo/server) locates its
