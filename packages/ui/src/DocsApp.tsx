@@ -479,6 +479,7 @@ export function DocsApp({
       setCreatingEndpointParentId("none");
       await refetchSpecAndFolders();
       selectEndpoint(created.vayoId);
+      setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to create endpoint");
     }
@@ -513,6 +514,7 @@ export function DocsApp({
     try {
       await api.deleteEndpoint(config, vayoId);
       await refetchSpecAndFolders();
+      setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to delete endpoint");
     }
