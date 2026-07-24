@@ -519,5 +519,25 @@ export function resolveEndpoint(
     setDeep(result, fieldPath, winningByFieldPath.get(fieldPath)!.value);
   }
 
+  // Backfills fields added to EndpointDoc after this particular document was
+  // last written and never since touched by a rescan/runtime capture (both
+  // of which already backfill these themselves, via mergeStaticResult's/
+  // mergeCapturedSample's own `existing?.field ?? default` handling) — a
+  // real, reachable case: MongoDB doesn't retroactively add fields to
+  // existing documents, so an install upgrading to a newer Vayo version has
+  // old EndpointDocs missing whatever's been added since, until each one is
+  // re-scanned or hit again. `resolveEndpoint` is the one gateway every
+  // consumer (compile(), every server route, the CLI) reads an endpoint
+  // through, so this is the single place to guarantee complete data rather
+  // than scattering the same `?? []`/`?? {}` fallback across every
+  // downstream reader. Found via a real end-to-end check against a
+  // pre-existing database — `openapi-compiler`'s `buildResponses` calls
+  // `Object.keys(declaredExamples)`, which throws outright ("Cannot convert
+  // undefined or null to object") rather than silently omitting anything,
+  // for any endpoint that predates this field.
+  result.declaredResponseStatuses ??= [];
+  result.declaredExamples ??= {};
+  result.description ??= null;
+
   return { ...(result as unknown as EndpointDoc), overridden };
 }
