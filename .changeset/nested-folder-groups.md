@@ -6,7 +6,7 @@
 "@vayo-hq/db-mongo": patch
 "@vayo-hq/server": patch
 "@vayo-hq/ui": patch
-"vayo": patch
+"@vayo-hq/cli": patch
 ---
 
 Added Swagger-style explicit route grouping: an `@group <name>` tag in a

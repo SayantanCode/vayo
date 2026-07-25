@@ -17,7 +17,7 @@ vayo/
 │   ├── db-mongo/                @vayo-hq/db-mongo
 │   ├── server/                  @vayo-hq/server
 │   ├── ui/                      @vayo-hq/ui
-│   └── cli/                     vayo
+│   └── cli/                     @vayo-hq/cli
 └── apps/
     └── demo-app/                 example Express app for local end-to-end dev
 ```
@@ -611,7 +611,7 @@ browser is where a UI regression would actually show up):
   inside a section exits Full Docs and lands on that one endpoint's Try It
   Now tab instead.
 
-## `vayo`
+## `@vayo-hq/cli`
 
 The actual product surface for anyone outside this repo — every other
 package only proves itself via hand-wired scripts inside `apps/demo-app`;

@@ -2,7 +2,7 @@
 "@vayo-hq/ast": patch
 "@vayo-hq/openapi-compiler": patch
 "@vayo-hq/ui": patch
-"vayo": patch
+"@vayo-hq/cli": patch
 ---
 
 Updated READMEs to document capabilities that had landed in code but never
