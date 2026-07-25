@@ -4,7 +4,13 @@ on:
   push:
     branches: [main]
 
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Explicit rather than relying on the (also-false) default: a second push
+  # landing while a publish is mid-flight must queue behind it, never cancel
+  # it — cancelling a real `npm publish` partway through is exactly the kind
+  # of "now what state is this in" mess this whole setup is trying to avoid.
+  cancel-in-progress: false
 
 jobs:
   version:
@@ -42,7 +48,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Newer than the rest of the repo's Node 20 baseline (packages'
+          # own `engines.node: >=20` is a consumer-facing requirement, not a
+          # constraint on what builds/publishes them) — found the hard way:
+          # `npm@latest` (12.x) itself now requires Node >=22.22.2, and 24 is
+          # the version actually confirmed to run OIDC trusted publishing
+          # reliably in practice, not just the minimum that satisfies npm's
+          # own engine check.
+          node-version: 24
           cache: pnpm
           # Required for npm's OIDC trusted-publish exchange to target the
           # right registry — without this, `npm publish` has nothing to
