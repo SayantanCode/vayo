@@ -5,7 +5,7 @@
     "@vayo-hq/demo-app": "0.0.0",
     "@vayo-hq/ast": "0.1.0",
     "@vayo-hq/capture-express": "0.1.0",
-    "vayo": "0.1.0",
+    "@vayo-hq/cli": "0.1.0",
     "@vayo-hq/db-mongo": "0.1.0",
     "@vayo-hq/openapi-compiler": "0.1.0",
     "@vayo-hq/schema-engine": "0.1.0",

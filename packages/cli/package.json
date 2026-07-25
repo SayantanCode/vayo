@@ -1,5 +1,5 @@
 {
-  "name": "vayo",
+  "name": "@vayo-hq/cli",
   "version": "0.1.1-beta.0",
   "license": "MIT",
   "description": "npx vayo init / scan / export",

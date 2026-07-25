@@ -1,4 +1,4 @@
-# vayo
+# @vayo-hq/cli
 
 The `vayo` command — self-hosted, auto-generating API documentation for
 Node/Express APIs. Zero manual annotation. Bring-your-own-database: Vayo
@@ -12,7 +12,7 @@ resolves to Express 5, which this rejects — install `express@^4.19.0`
 explicitly).
 
 ```bash
-npm install vayo @vayo-hq/capture-express @vayo-hq/db-mongo express@^4.19.0
+npm install @vayo-hq/cli @vayo-hq/capture-express @vayo-hq/db-mongo express@^4.19.0
 ```
 
 ## Quickstart

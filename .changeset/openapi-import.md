@@ -1,6 +1,6 @@
 ---
 "@vayo-hq/openapi-compiler": patch
-"vayo": patch
+"@vayo-hq/cli": patch
 ---
 
 Added `vayo import <file>`: enriches endpoints Vayo has already discovered

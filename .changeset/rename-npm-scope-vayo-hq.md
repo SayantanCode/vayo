@@ -7,7 +7,7 @@
 "@vayo-hq/capture-express": patch
 "@vayo-hq/server": patch
 "@vayo-hq/ui": patch
-"vayo": patch
+"@vayo-hq/cli": patch
 ---
 
 Renamed the npm scope from `@vayo` to `@vayo-hq` — the `@vayo` organization

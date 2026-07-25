@@ -1,5 +1,5 @@
 ---
-"vayo": patch
+"@vayo-hq/cli": patch
 ---
 
 `vayo init`'s printed next steps now show same-port embedding

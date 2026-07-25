@@ -12,7 +12,7 @@
       "@vayo-hq/capture-express",
       "@vayo-hq/server",
       "@vayo-hq/ui",
-      "vayo"
+      "@vayo-hq/cli"
     ]
   ],
   "linked": [],

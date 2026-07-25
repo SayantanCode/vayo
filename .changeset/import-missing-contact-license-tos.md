@@ -1,6 +1,6 @@
 ---
 "@vayo-hq/openapi-compiler": patch
-"vayo": patch
+"@vayo-hq/cli": patch
 ---
 
 Fixed `vayo import` silently dropping `info.contact`/`info.license`/
