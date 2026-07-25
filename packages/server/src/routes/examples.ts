@@ -20,7 +20,13 @@ export function createExamplesRouter({ db }: RouteDeps): Router {
     res.json(await db.listExamples(req.params.vayoId!));
   });
 
-  router.post("/api/examples/:vayoId/pin", requireRole("viewer"), async (req, res) => {
+  // editor, not viewer: pinning decides what becomes a permanent example in
+  // the exported spec — a real content mutation ("maintain the docs",
+  // docs/05-security.md §4), not a read-only or self-service action. The UI
+  // already hides this button from a viewer (canEdit), but that's the
+  // courtesy layer, not the enforcement — found gated at "viewer" here,
+  // asymmetric with this same route's own DELETE (already "editor" below).
+  router.post("/api/examples/:vayoId/pin", requireRole("editor"), async (req, res) => {
     const parsed = pinExampleBodySchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "invalid body", details: parsed.error.issues });

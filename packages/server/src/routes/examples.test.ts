@@ -9,17 +9,33 @@ describe("pinned examples — smoke coverage", () => {
   it("pins an example and lists it back", async () => {
     const db = createFakeDb();
     const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
+    const { token: editorToken } = await seedMemberWithSession(db, SESSION_SECRET, "editor");
+    const { token: viewerToken } = await seedMemberWithSession(db, SESSION_SECRET, "viewer");
+
+    const pinned = await request(app)
+      .post("/api/examples/ep_1/pin")
+      .set("Authorization", `Bearer ${editorToken}`)
+      .send({ statusCode: 200, requestBody: null, responseBody: { ok: true }, label: "Happy path" });
+    expect(pinned.status).toBe(201);
+
+    const list = await request(app).get("/api/examples/ep_1").set("Authorization", `Bearer ${viewerToken}`);
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].label).toBe("Happy path");
+  });
+
+  it("rejects a viewer pinning an example, even though the UI already hides the button for one — a real content mutation, not read-only or self-service", async () => {
+    const db = createFakeDb();
+    const { app } = createServer({ db, sessionSecret: SESSION_SECRET, mountPath: "/" });
     const { token } = await seedMemberWithSession(db, SESSION_SECRET, "viewer");
 
     const pinned = await request(app)
       .post("/api/examples/ep_1/pin")
       .set("Authorization", `Bearer ${token}`)
-      .send({ statusCode: 200, requestBody: null, responseBody: { ok: true }, label: "Happy path" });
-    expect(pinned.status).toBe(201);
+      .send({ statusCode: 200, requestBody: null, responseBody: { ok: true }, label: "Sneaky pin" });
+    expect(pinned.status).toBe(403);
 
     const list = await request(app).get("/api/examples/ep_1").set("Authorization", `Bearer ${token}`);
-    expect(list.body).toHaveLength(1);
-    expect(list.body[0].label).toBe("Happy path");
+    expect(list.body).toHaveLength(0);
   });
 
   it("GET /api/examples/:vayoId returns real captured examples alongside pinned ones, not pinned-only", async () => {
