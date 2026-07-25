@@ -68,6 +68,30 @@ describe("importCommand", () => {
     );
   });
 
+  it("updates project settings from info.contact/license/termsOfService too", async () => {
+    const file = writeSpec({
+      info: {
+        title: "My Company API",
+        contact: { name: "API Team", email: "api@example.com" },
+        license: { name: "MIT", url: "https://opensource.org/licenses/MIT" },
+        termsOfService: "https://example.com/terms",
+      },
+      paths: {},
+    });
+    await importCommand({ format: "openapi", file, version: "v1" });
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "My Company API",
+        contactName: "API Team",
+        contactEmail: "api@example.com",
+        licenseName: "MIT",
+        licenseUrl: "https://opensource.org/licenses/MIT",
+        termsOfService: "https://example.com/terms",
+      }),
+      "system:cli-import",
+    );
+  });
+
   it("creates an environment per new server, skipping one whose baseUrl already exists", async () => {
     listEnvironments.mockResolvedValue([{ variables: { baseUrl: "https://already-there.example.com" } }]);
     const file = writeSpec({
