@@ -1,5 +1,5 @@
 ---
-"@vayo/ui": patch
+"@vayo-hq/ui": patch
 ---
 
 Fixed the header toolbar getting crushed on anything narrower than a very

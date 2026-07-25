@@ -1,11 +1,11 @@
 // apps/demo-app/src/scan.ts — stand-in for the future `vayo scan` CLI
-// command (packages/cli isn't built yet). Runs @vayo/ast's static pass
+// command (packages/cli isn't built yet). Runs @vayo-hq/ast's static pass
 // against this app and merges the result into vayo_endpoints via
 // VayoDbAdapter.upsertStaticResult (docs/04-capture-engine.md Step 2).
 
-import { scanProject, type VayoConfig } from "@vayo/ast";
-import { createAdapter } from "@vayo/db-mongo";
-import { resolveVersion } from "@vayo/schema-engine";
+import { scanProject, type VayoConfig } from "@vayo-hq/ast";
+import { createAdapter } from "@vayo-hq/db-mongo";
+import { resolveVersion } from "@vayo-hq/schema-engine";
 
 const mongoUri = process.env.VAYO_MONGO_URI;
 if (!mongoUri) {

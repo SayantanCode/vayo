@@ -1,10 +1,10 @@
-// vayo — vayo scan: runs @vayo/ast's static pass and merges the result
+// vayo — vayo scan: runs @vayo-hq/ast's static pass and merges the result
 // into vayo_endpoints (docs/04-capture-engine.md Step 2), the same logic
 // apps/demo-app/src/scan.ts proved by hand.
 
-import { scanProject } from "@vayo/ast";
-import { createAdapter } from "@vayo/db-mongo";
-import { resolveVersion } from "@vayo/schema-engine";
+import { scanProject } from "@vayo-hq/ast";
+import { createAdapter } from "@vayo-hq/db-mongo";
+import { resolveVersion } from "@vayo-hq/schema-engine";
 import { loadConfig, requireMongoUri } from "../config.js";
 
 export interface ScanOptions {

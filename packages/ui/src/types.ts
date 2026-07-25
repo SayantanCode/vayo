@@ -1,9 +1,9 @@
-// @vayo/ui — UI-facing shapes derived from the compiled OpenAPI document
-// (@vayo/openapi-compiler's output, including its x-vayo-* extensions).
+// @vayo-hq/ui — UI-facing shapes derived from the compiled OpenAPI document
+// (@vayo-hq/openapi-compiler's output, including its x-vayo-* extensions).
 // Deliberately loose/local rather than importing OpenAPI types from
 // elsewhere — the UI only ever reads a handful of fields off this document.
 
-import type { FolderDoc, JSONSchema, TeamRole } from "@vayo/types";
+import type { FolderDoc, JSONSchema, TeamRole } from "@vayo-hq/types";
 
 export interface OpenApiParameter {
   name: string;
@@ -18,7 +18,7 @@ export interface OpenApiResponse {
     "application/json": {
       schema?: JSONSchema;
       /** Standard OpenAPI `examples` field — populated by
-       * `@vayo/openapi-compiler` under the `"declared"` key when the
+       * `@vayo-hq/openapi-compiler` under the `"declared"` key when the
        * endpoint has an `@example <status> <JSON>` tag for this status
        * (docs/04-capture-engine.md Step 2 #4b). */
       examples?: { declared?: { value: unknown } };
@@ -35,7 +35,7 @@ export interface OpenApiOperation {
    * one-liner `summary` above. Absent when there's no `@description` tag. */
   description?: string;
   parameters?: OpenApiParameter[];
-  /** `@vayo/openapi-compiler` uses `multipart/form-data` instead of
+  /** `@vayo-hq/openapi-compiler` uses `multipart/form-data` instead of
    * `application/json` whenever the schema has a file field (`format:
    * "binary"`, a real file upload is never actually JSON on the wire) — use
    * `requestBodySchema()` below rather than indexing `application/json`
@@ -178,7 +178,7 @@ export function resolveOrigin(template: string, variables: Record<string, string
 }
 
 /** The request body's schema, regardless of which media type
- * `@vayo/openapi-compiler` used to wrap it (`application/json` ordinarily,
+ * `@vayo-hq/openapi-compiler` used to wrap it (`application/json` ordinarily,
  * `multipart/form-data` for a file upload) — callers that only care about
  * the shape (DetailsTab, CodeSamplePanel) shouldn't need to know or guess
  * which key is present. `undefined` when there's no request body at all. */

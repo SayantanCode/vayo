@@ -1,4 +1,4 @@
-// @vayo/ui — shared avatar: a member's uploaded picture if they have one,
+// @vayo-hq/ui — shared avatar: a member's uploaded picture if they have one,
 // else a deterministic initials-in-a-circle fallback (same visual slot
 // either way, so callers never need to branch on whether an avatar exists).
 // Optionally overlays a presence dot — omitted entirely when `online` isn't

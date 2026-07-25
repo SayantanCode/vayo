@@ -1,5 +1,5 @@
-// @vayo/server — vayo_examples: saved/pinned request+response pairs, on top
-// of the rolling-window captures @vayo/capture-express already writes.
+// @vayo-hq/server — vayo_examples: saved/pinned request+response pairs, on top
+// of the rolling-window captures @vayo-hq/capture-express already writes.
 import { Router } from "express";
 import { z } from "zod";
 import { requireRole } from "../auth-middleware.js";

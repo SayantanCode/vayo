@@ -1,6 +1,6 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { VayoDbAdapter } from "@vayo/types";
+import type { VayoDbAdapter } from "@vayo-hq/types";
 import { createServer } from "../index.js";
 import { createFakeDb, seedMemberWithSession } from "../test-helpers/fakeDb.js";
 

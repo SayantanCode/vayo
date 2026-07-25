@@ -1,11 +1,11 @@
-// @vayo/server — the Socket.IO gateway (docs/06-realtime-collaboration.md).
+// @vayo-hq/server — the Socket.IO gateway (docs/06-realtime-collaboration.md).
 // Presence, live comments, and live overrides — every mutating event also
 // goes through the same DB-writing helpers the REST routes use
 // (routes/comments.ts's addComment, routes/overrides.ts's applyOverride),
 // never instead of them: "Socket.IO is a transport, not a source of truth."
 import type { Request } from "express";
 import type { Server as SocketIOServer } from "socket.io";
-import type { TeamRole } from "@vayo/types";
+import type { TeamRole } from "@vayo-hq/types";
 import { resolveAuth, ROLE_RANK, type AuthResult } from "./auth-middleware.js";
 import { addComment } from "./routes/comments.js";
 import { applyOverride, checkOverrideAllowed } from "./routes/overrides.js";

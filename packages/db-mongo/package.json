@@ -1,5 +1,5 @@
 {
-  "name": "@vayo/db-mongo",
+  "name": "@vayo-hq/db-mongo",
   "version": "0.1.1-beta.0",
   "license": "MIT",
   "description": "MongoDB implementation of VayoDbAdapter (native driver, not Mongoose) plus vayo init migrations. Implements the BYODB layer.",
@@ -19,8 +19,8 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@vayo/types": "workspace:*",
-    "@vayo/schema-engine": "workspace:*",
+    "@vayo-hq/types": "workspace:*",
+    "@vayo-hq/schema-engine": "workspace:*",
     "mongodb": "^6.8.0"
   }
 }

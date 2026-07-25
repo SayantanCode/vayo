@@ -1,11 +1,11 @@
-// @vayo/ui — Details tab's sticky right-column response reference:
+// @vayo-hq/ui — Details tab's sticky right-column response reference:
 // status-code tabs + an Example/Schema toggle (the "Show Schema" control
 // from the Redoc/Scalar reference layouts). The Schema view reuses the
 // existing SchemaField tree — this toggle is just two views of data Vayo
 // already has, no new schema logic.
 
 import { useState } from "react";
-import type { ExampleDoc } from "@vayo/types";
+import type { ExampleDoc } from "@vayo-hq/types";
 import type { EndpointSummary } from "../types.js";
 import type { ApiConfig } from "../api.js";
 import { exampleFromSchema } from "../example-from-schema.js";

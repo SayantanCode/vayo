@@ -1,4 +1,4 @@
-// @vayo/ui — shared relative-time formatting, extracted out of
+// @vayo-hq/ui — shared relative-time formatting, extracted out of
 // NotificationBell (its original, only caller) so the Team modal's
 // "last seen" display doesn't duplicate the same thresholds.
 

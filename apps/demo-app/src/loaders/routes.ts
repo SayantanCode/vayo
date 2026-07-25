@@ -1,7 +1,7 @@
 // apps/demo-app/src/loaders/routes.ts — the ONE place that knows every
 // domain router's mount prefix. Each router is a plain express.Router()
 // default-exported from its own file under src/routes/<group>/ — the
-// folder/mount-path convention @vayo/ast's group-inference already knows
+// folder/mount-path convention @vayo-hq/ast's group-inference already knows
 // about (docs/04-capture-engine.md Step 2 #4). Products and Admin-products
 // each have a v1 and a v2 router (two separate files, same folder — still
 // one auto-inferred group) since that's the one resource actually versioned

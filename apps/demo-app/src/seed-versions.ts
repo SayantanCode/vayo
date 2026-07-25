@@ -7,7 +7,7 @@
 // counterpart, which is realistic — a version bump doesn't mean every
 // route changed.
 
-import { createAdapter } from "@vayo/db-mongo";
+import { createAdapter } from "@vayo-hq/db-mongo";
 
 const mongoUri = process.env.VAYO_MONGO_URI;
 if (!mongoUri) {

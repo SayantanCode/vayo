@@ -27,8 +27,8 @@ gantt
 ## M0 — Foundation
 
 - pnpm monorepo scaffolded per `08-packages-and-repo-structure.md`.
-- `@vayo/types` with every interface from `03-data-model.md`.
-- `@vayo/db-mongo` with `runMigrations` creating all `vayo_*` collections
+- `@vayo-hq/types` with every interface from `03-data-model.md`.
+- `@vayo-hq/db-mongo` with `runMigrations` creating all `vayo_*` collections
   and indexes.
 - `vayo`'s `vayo init` working end-to-end against a real MongoDB URI.
 - **Done when:** running `vayo init` against a fresh Mongo Atlas free-tier
@@ -59,7 +59,7 @@ gantt
 
 ## M3 — Server, auth, RBAC
 
-- `@vayo/server`'s REST API: spec resolution, overrides, comments, team,
+- `@vayo-hq/server`'s REST API: spec resolution, overrides, comments, team,
   invites — every mutating route behind `requireRole`.
 - Both auth modes from `05-security.md` §5 (delegated + standalone).
 - **Done when:** a `viewer`-role session gets a 403 hitting `/api/overrides`
@@ -258,7 +258,7 @@ gantt
     `computeCoverageReport` specifically so it's unit-testable against
     hand-built `ResolvedEndpoint` fixtures — neither a "static"-sourced
     endpoint nor a schema-change history is reachable through
-    `@vayo/server`'s own HTTP surface at all (only `@vayo/ast`'s scan output
+    `@vayo-hq/server`'s own HTTP surface at all (only `@vayo-hq/ast`'s scan output
     and real traffic produce them), so there was no way to exercise these
     checks through routes alone.
   - **Team management** gained the ability to fix the two most common
@@ -320,7 +320,7 @@ gantt
     silently did nothing until this was caught live-testing in the browser
     and fixed to read the same `selected` value the rest of the header
     already uses.
-- Two adoption-friction questions, both about how `@vayo/server` shares a
+- Two adoption-friction questions, both about how `@vayo-hq/server` shares a
   process/port with the host app it's documenting: "can mounting it be as
   simple as swagger-ui-express's one-liner" and "can our own Socket.IO
   server conflict with the host's own WebSocket setup."
@@ -354,7 +354,7 @@ gantt
     Engine.IO's old default path and had to start passing the new
     `/vayo/socket.io` explicitly to keep matching the server they were
     testing against.
-- Answered directly, no code change: yes, `@vayo/server` documents both a
+- Answered directly, no code change: yes, `@vayo-hq/server` documents both a
   monolith (one Express app, one `capture()`, one `vayo serve`) and a
   Node.js microservices setup (each service runs its own `capture()`
   middleware, all pointed at the same shared Mongo URI, so `vayo scan` and
@@ -399,7 +399,7 @@ gantt
   actually fixable within v1's own constraints got fixed, one at a time, each
   verified with a full build + the whole test suite + a live browser check
   before moving to the next:
-  - **`@vayo/server` split from one 1,546-line `index.ts` into an
+  - **`@vayo-hq/server` split from one 1,546-line `index.ts` into an
     orchestrator (331 lines) plus 15 per-resource route modules and 4 shared
     foundation modules** (`auth-middleware.ts`, `error-handling.ts`,
     `realtime.ts`, `server-deps.ts`) — see `08-packages-and-repo-structure.md`
@@ -416,7 +416,7 @@ gantt
     middleware that logs server-side and returns a clean `{error: "internal
     server error"}` instead of a hung request or a crash. Previously only 6
     of ~54 routes had any error handling at all.
-  - **`@vayo/ui` gained `hooks/` and `contexts/` directories** (neither
+  - **`@vayo-hq/ui` gained `hooks/` and `contexts/` directories** (neither
     existed before): a shared `useDismiss`/`useEscapeKey` hook pair replaced
     4 different overlay-dismiss implementations copy-pasted across 13+
     files (a shared `Modal` component now backs all 9 modals, gaining
@@ -437,10 +437,10 @@ gantt
     `style-src` additionally allows `'unsafe-inline'` since React's own
     `style={{...}}` props compile to inline style attributes — a standard,
     much lower-severity relaxation than loosening `script-src`).
-  - **`MAX_ATTACHMENT_BYTES` centralized into `@vayo/types`**, removing a
+  - **`MAX_ATTACHMENT_BYTES` centralized into `@vayo-hq/types`**, removing a
     manually-hand-synced duplicate that previously lived independently in
-    both `@vayo/server` and `@vayo/db-mongo` — without giving `@vayo/server`
-    a direct dependency on `@vayo/db-mongo`, since `@vayo/types` is the one
+    both `@vayo-hq/server` and `@vayo-hq/db-mongo` — without giving `@vayo-hq/server`
+    a direct dependency on `@vayo-hq/db-mongo`, since `@vayo-hq/types` is the one
     layer both (and any future adapter) already share.
   - **`GET /api/audit-log/export`** (owner-only, JSON or CSV): a full,
     project-wide audit-trail export — every override/comment/invite/role-
@@ -459,7 +459,7 @@ gantt
     (`01-vision-and-market.md`): confirmed zero Mongo-specific types across
     all ~30 methods (every id is a plain `string`; the one binary-stream
     method is typed `unknown` specifically so no adapter's concrete stream
-    type leaks into the shared interface). A `@vayo/db-postgres` package is
+    type leaks into the shared interface). A `@vayo-hq/db-postgres` package is
     genuinely viable future work on top of this interface — deliberately
     not attempted in this pass, since rushing the data layer everything
     else depends on is a worse outcome than an honest "not built yet."
@@ -475,7 +475,7 @@ gantt
     source-side "God file" problem it was mirroring is now fully solved;
     splitting the test file the same way is real but lower-value follow-up
     work, not something with its own separate risk to carry.
-- `@vayo/ast` gained three more swagger-jsdoc-style leading-comment tags,
+- `@vayo-hq/ast` gained three more swagger-jsdoc-style leading-comment tags,
   all gated behind the same `@vayo` sentinel `@group`/`@deprecated` already
   require: `@response <status> <SchemaName>` (a Zod schema resolved by
   name — same-file `const`, ESM import, or CommonJS destructured
@@ -548,7 +548,7 @@ gantt
   `--overwrite` is passed; a spec operation with no matching endpoint is
   reported unmatched, never created. Split the same "plan here, apply
   there" way `compile()`/`diffSpecs` already are:
-  `@vayo/openapi-compiler`'s `planOpenApiImport` is pure and fully
+  `@vayo-hq/openapi-compiler`'s `planOpenApiImport` is pure and fully
   unit-tested without a database; the CLI command is the thin I/O layer.
   Deliberately v1-scoped: JSON input only (YAML is a clean follow-up via
   `@apidevtools/swagger-parser`'s own loader, already a dependency), and

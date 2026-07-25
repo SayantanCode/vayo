@@ -1,4 +1,4 @@
-// @vayo/ui — the live Socket.IO connection, shared the same way ConfigContext
+// @vayo-hq/ui — the live Socket.IO connection, shared the same way ConfigContext
 // shares the API config. `null` is a legitimate value (not yet authenticated,
 // or the caller never provided a socketUrl), unlike config which is always
 // present once the app renders past the login gate — so this doesn't throw.

@@ -3,8 +3,8 @@
 // traffic and confirm the inferred schema looks right, with zero
 // annotations written anywhere in this file (or app.ts).
 
-import { capture } from "@vayo/capture-express";
-import { createAdapter, runMigrations } from "@vayo/db-mongo";
+import { capture } from "@vayo-hq/capture-express";
+import { createAdapter, runMigrations } from "@vayo-hq/db-mongo";
 import { createApp } from "./app.js";
 
 const mongoUri = process.env.VAYO_MONGO_URI;

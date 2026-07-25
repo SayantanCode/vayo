@@ -1,4 +1,4 @@
-// @vayo/ui — Coverage: what's still auto-only vs. human-confirmed for this
+// @vayo-hq/ui — Coverage: what's still auto-only vs. human-confirmed for this
 // version. Not a blocker or a validation gate — a review queue. Tells a doc
 // author where a human pass is still needed, and tells a frontend consumer
 // which error shapes are genuinely unknown rather than documented-as-absent.

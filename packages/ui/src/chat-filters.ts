@@ -1,4 +1,4 @@
-// @vayo/ui — Team Chat's date/time filter, pulled out as pure functions
+// @vayo-hq/ui — Team Chat's date/time filter, pulled out as pure functions
 // (same reasoning as mentions.ts) so the actual date-window logic is
 // unit-testable without mounting the component.
 

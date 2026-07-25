@@ -1,11 +1,11 @@
 // apps/demo-app/src/seed-team.ts — one-off script to seed team members for
-// manually verifying @vayo/server's RBAC (docs/09-roadmap.md M3 done-when).
+// manually verifying @vayo-hq/server's RBAC (docs/09-roadmap.md M3 done-when).
 // Real bootstrapping is `vayo init`'s job (packages/cli, not built yet);
 // this bypasses the invite flow only to create the very first owner, same
 // as any real deployment would need some out-of-band first-admin step.
 
 import bcrypt from "bcrypt";
-import { createAdapter } from "@vayo/db-mongo";
+import { createAdapter } from "@vayo-hq/db-mongo";
 
 const mongoUri = process.env.VAYO_MONGO_URI;
 if (!mongoUri) {

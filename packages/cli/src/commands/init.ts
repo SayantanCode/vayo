@@ -8,7 +8,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import prompts from "prompts";
-import { runMigrations } from "@vayo/db-mongo";
+import { runMigrations } from "@vayo-hq/db-mongo";
 import { DEFAULT_CONFIG_PATH } from "../config.js";
 
 /** Whether the CONSUMER's project is set up for ESM `.js` files
@@ -100,7 +100,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
   writeFileSync(
     configPath,
     esm
-      ? `/** @type {import('@vayo/ast').VayoConfig} */
+      ? `/** @type {import('@vayo-hq/ast').VayoConfig} */
 export default {
   appEntryPath: ${JSON.stringify(appEntryPath)},
   // authMiddlewarePatterns: ["verifyJWT"],  // add your own auth middleware's function name(s)
@@ -108,7 +108,7 @@ export default {
   // redact: [/creditCard/i],                // additional field-name patterns to redact
 };
 `
-      : `/** @type {import('@vayo/ast').VayoConfig} */
+      : `/** @type {import('@vayo-hq/ast').VayoConfig} */
 module.exports = {
   appEntryPath: ${JSON.stringify(appEntryPath)},
   // authMiddlewarePatterns: ["verifyJWT"],  // add your own auth middleware's function name(s)
@@ -154,20 +154,20 @@ module.exports = undefined; // <- replace with your bootstrapped Express app
   console.log("vayo: ran migrations — vayo_* collections are ready.");
 
   const wiringSnippet = esm
-    ? `       import { capture } from "@vayo/capture-express";
-       import { createAdapter } from "@vayo/db-mongo";
+    ? `       import { capture } from "@vayo-hq/capture-express";
+       import { createAdapter } from "@vayo-hq/db-mongo";
        const db = createAdapter(process.env.VAYO_MONGO_URI);
        app.use(capture({ db }));`
-    : `       const { capture } = require("@vayo/capture-express");
-       const { createAdapter } = require("@vayo/db-mongo");
+    : `       const { capture } = require("@vayo-hq/capture-express");
+       const { createAdapter } = require("@vayo-hq/db-mongo");
        const db = createAdapter(process.env.VAYO_MONGO_URI);
        app.use(capture({ db }));`;
 
   const embedSnippet = esm
-    ? `       import { createServer } from "@vayo/server";
+    ? `       import { createServer } from "@vayo-hq/server";
        const { app: vayoApp } = createServer({ db, mountPath: "/docs", httpServer: server });
        app.use(vayoApp); // docs now live at http://localhost:<your-port>/docs`
-    : `       const { createServer } = require("@vayo/server");
+    : `       const { createServer } = require("@vayo-hq/server");
        const { app: vayoApp } = createServer({ db, mountPath: "/docs", httpServer: server });
        app.use(vayoApp); // docs now live at http://localhost:<your-port>/docs`;
 

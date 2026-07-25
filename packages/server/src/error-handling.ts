@@ -1,4 +1,4 @@
-// @vayo/server — centralized async error handling.
+// @vayo-hq/server — centralized async error handling.
 //
 // Express 4 (this package's pinned version — 08-packages-and-repo-structure.md
 // on why v4, not v5) does NOT catch a rejected promise thrown inside an
@@ -11,7 +11,7 @@
 // Rather than thread a manual try/catch (or an asyncHandler(...) wrapper)
 // through every individual route registration by hand, autoCatchAsyncErrors
 // patches the router's own get/post/put/patch/delete methods once, so every
-// route @vayo/server registers — present and future — is covered
+// route @vayo-hq/server registers — present and future — is covered
 // automatically, with no route author able to forget it.
 import type { NextFunction, Request, RequestHandler, Response, Router } from "express";
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { CalendarClock, CircleStop, CornerUpLeft, File, Flag, MonitorPlay, Paperclip, Search, X } from "lucide-react";
-import type { AttachmentDoc, CommentDoc } from "@vayo/types";
+import type { AttachmentDoc, CommentDoc } from "@vayo-hq/types";
 import { api, ApiError } from "../../api.js";
 import { applyMentionSelection, detectMentionTrigger, type MentionTrigger } from "../../mentions.js";
 import { DATE_FILTERS, DATE_FILTER_LABELS, matchesDateFilter, type DateFilter } from "../../chat-filters.js";

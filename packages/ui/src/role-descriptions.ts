@@ -1,4 +1,4 @@
-// @vayo/ui — one sentence per role, shown wherever a role is picked or
+// @vayo-hq/ui — one sentence per role, shown wherever a role is picked or
 // displayed (TeamModal's invite/role-change pickers, AcceptInviteScreen's
 // confirmation). The 3-role model itself is intentionally not more granular
 // than this (docs/05-security.md §4): every server route's role check maps
@@ -7,7 +7,7 @@
 // this closes is discoverability, not capability — a bare "editor" in a
 // dropdown doesn't say what that actually grants.
 
-import type { TeamRole } from "@vayo/types";
+import type { TeamRole } from "@vayo-hq/types";
 
 export const ROLE_DESCRIPTIONS: Record<TeamRole, string> = {
   viewer: "Can view every endpoint and take part in Team Chat. Can't edit docs or manage the team.",

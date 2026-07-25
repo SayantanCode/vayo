@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ResolvedEndpoint } from "@vayo/types";
+import type { ResolvedEndpoint } from "@vayo-hq/types";
 import {
   X_VAYO_AUTH_REQUIRED,
   X_VAYO_AUTH_TYPE,

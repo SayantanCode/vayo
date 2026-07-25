@@ -33,7 +33,7 @@ turning "one running conversation" into "a tree of sub-conversations."
 
 ## Topology
 
-Socket.IO server is embedded inside `@vayo/server` — same process, same
+Socket.IO server is embedded inside `@vayo-hq/server` — same process, same
 deployment unit, for v1. Single instance is sufficient at the scale this product
 targets (one team's internal docs, not a multi-tenant SaaS), so there is no
 Redis adapter / horizontal-scaling requirement yet. Document this as the
@@ -121,7 +121,7 @@ also goes through the equivalent REST write (`POST /api/comments`,
 
 - A client that reconnects after a drop just re-fetches current state via REST
   and doesn't need any special "catch-up" socket protocol.
-- Running two instances of `@vayo/server` behind a load balancer without the
+- Running two instances of `@vayo-hq/server` behind a load balancer without the
   Redis adapter degrades gracefully to "presence/live-update might miss a
   cross-instance event" while writes/reads through Mongo stay fully correct —
   an acceptable v1 tradeoff, not silently broken data.
@@ -136,7 +136,7 @@ hand-authored announcement feature (a real, considered alternative; automatic
 tracking was chosen as the higher-value v1 scope).
 
 Real-time delivery has one honest gap: `override`/`comment`/`version_status`
-notifications are created inside `@vayo/server` (which already has the
+notifications are created inside `@vayo-hq/server` (which already has the
 Socket.IO `io` instance in scope) and broadcast immediately via
 `notification:new` to the `project` room. `schema_change` notifications,
 however, are created inside `db-mongo`'s `upsertEndpoint` — called from
@@ -169,7 +169,7 @@ rare but must not corrupt data:
 ## Presence UI data
 
 Presence is ephemeral and does not need to survive a server restart — keep it
-in-memory in `@vayo/server` (a `Map<vayoId, Set<memberId>>`), not in
+in-memory in `@vayo-hq/server` (a `Map<vayoId, Set<memberId>>`), not in
 Mongo. Losing presence state on a restart is a non-event (everyone's client
 reconnects and rejoins within seconds); persisting it would be complexity spent
 on a problem that doesn't exist.
@@ -193,7 +193,7 @@ only goes offline once *both* close. State changes:
 
 ## Future scaling note (not built now)
 
-If a later version needs multiple `@vayo/server` instances behind a load
+If a later version needs multiple `@vayo-hq/server` instances behind a load
 balancer, Socket.IO's official Redis adapter is the standard upgrade —
 mentioned here only so nobody re-derives this from scratch later, not as
 something to build in v1.

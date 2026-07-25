@@ -1,4 +1,4 @@
-// @vayo/ui — pure code-snippet generators shared between Try It Now's
+// @vayo-hq/ui — pure code-snippet generators shared between Try It Now's
 // "Copy as curl" and the Details tab's read-only code sample panel. A
 // small, data-driven list (`SNIPPET_LANGUAGES`) so adding a third
 // language later is a one-line addition, not a redesign.

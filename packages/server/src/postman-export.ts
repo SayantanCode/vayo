@@ -1,11 +1,11 @@
-// @vayo/server — Postman Collection v2.1 + Environment export. A small,
+// @vayo-hq/server — Postman Collection v2.1 + Environment export. A small,
 // single-consumer transform colocated here rather than its own package —
 // nothing else in the system depends on Postman's format the way things
-// depend on @vayo/openapi-compiler's OpenAPI output. Folders nest exactly
+// depend on @vayo-hq/openapi-compiler's OpenAPI output. Folders nest exactly
 // like Vayo's own sidebar tree, since both are backed by the same
 // vayo_folders + endpoint-placement-override data.
 
-import type { EnvironmentDoc, ExampleDoc, FolderDoc, ResolvedEndpoint, TestScriptDoc } from "@vayo/types";
+import type { EnvironmentDoc, ExampleDoc, FolderDoc, ResolvedEndpoint, TestScriptDoc } from "@vayo-hq/types";
 
 const STATUS_TEXT: Record<number, string> = {
   200: "OK",

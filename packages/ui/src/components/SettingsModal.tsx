@@ -1,11 +1,11 @@
-// @vayo/ui — project-wide title/description/contact/license/termsOfService
+// @vayo-hq/ui — project-wide title/description/contact/license/termsOfService
 // shown in the exported spec's info object (the equivalent of
 // swagger-jsdoc's options.definition.info), editable through the docs UI
 // instead of only ever hardcoded in a config file. Follows the existing
 // .modal/.field conventions from EnvironmentsModal.
 
 import { useState } from "react";
-import type { SettingsDoc } from "@vayo/types";
+import type { SettingsDoc } from "@vayo-hq/types";
 import { Modal } from "./Modal.js";
 
 export interface SettingsPatch {

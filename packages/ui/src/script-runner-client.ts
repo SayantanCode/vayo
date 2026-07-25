@@ -1,4 +1,4 @@
-// @vayo/ui — main-thread side of the sandboxed script runner. Spawns a
+// @vayo-hq/ui — main-thread side of the sandboxed script runner. Spawns a
 // fresh Web Worker per run (via Vite's native `new Worker(new URL(...))`
 // pattern) and terminates it either on completion or on timeout — a
 // worker that never posts back (e.g. an accidental infinite loop in the

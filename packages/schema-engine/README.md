@@ -1,4 +1,4 @@
-# @vayo/schema-engine
+# @vayo-hq/schema-engine
 
 Framework-agnostic schema inference and merge logic for
 [Vayo](https://www.npmjs.com/package/vayo) — no Express import, no
@@ -12,12 +12,12 @@ re-scan or new traffic can never silently erase a manual edit. Key exports:
 - `mergeCapturedSample(existing, sample)` — fold one observed
   request/response into an endpoint's inferred schema.
 - `mergeStaticResult(existing, route, version)` — fold in
-  [`@vayo/ast`](https://www.npmjs.com/package/@vayo/ast)'s static scan result.
+  [`@vayo-hq/ast`](https://www.npmjs.com/package/@vayo-hq/ast)'s static scan result.
 - `resolveEndpoint(endpoint, overrides)` — apply `vayo_overrides` on top of
   a stored `EndpointDoc`, non-destructively.
 - `resolveVersion`, `stableHash`, `resolveAuthRequired`, `detectSchemaChange`.
 
-Consumed internally by [`@vayo/db-mongo`](https://www.npmjs.com/package/@vayo/db-mongo)
+Consumed internally by [`@vayo-hq/db-mongo`](https://www.npmjs.com/package/@vayo-hq/db-mongo)
 (which calls these merge functions on every capture/scan) — most people
 won't import this directly. Start with
 [`vayo`](https://www.npmjs.com/package/vayo).

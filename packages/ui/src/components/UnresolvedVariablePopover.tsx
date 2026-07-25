@@ -1,4 +1,4 @@
-// @vayo/ui — Postman-style "Unresolved Variable" popover: shown while
+// @vayo-hq/ui — Postman-style "Unresolved Variable" popover: shown while
 // hovering a red (invalid) `{{variable}}` token inside a VariableField.
 // Vayo only has one kind of variable (environment-scoped — no separate
 // collection/global scope the way Postman has), so the add-variable form

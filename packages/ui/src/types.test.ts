@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FolderDoc } from "@vayo/types";
+import type { FolderDoc } from "@vayo-hq/types";
 import {
   buildTree,
   flattenSpec,

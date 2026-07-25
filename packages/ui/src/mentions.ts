@@ -1,7 +1,7 @@
-// @vayo/ui — inline reference tokens for Team Chat: @mentions (people) and
+// @vayo-hq/ui — inline reference tokens for Team Chat: @mentions (people) and
 // #tags (endpoints), parsed in one pass and composed the same way. Stored
 // raw as `@[Display Name](memberId)` / `#[path](vayoId)` (mirrors the
-// extraction `@vayo/server` does independently server-side, for
+// extraction `@vayo-hq/server` does independently server-side, for
 // notifications and for deriving which endpoints a message is about)
 // rather than freeform text matching, so a reference is unambiguous even
 // with duplicate names/paths and rendering never has to guess what a token

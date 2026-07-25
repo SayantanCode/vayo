@@ -1,5 +1,5 @@
 // apps/demo-app/src/verify-realtime.ts — one-off script proving
-// docs/09-roadmap.md M4 done-when against @vayo/server's real Socket.IO
+// docs/09-roadmap.md M4 done-when against @vayo-hq/server's real Socket.IO
 // gateway: two sessions (editor + viewer) see each other's live events, and
 // the viewer-role socket's attempted override:updated is rejected
 // server-side, not just hidden client-side.

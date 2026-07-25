@@ -1,7 +1,7 @@
-# @vayo/types
+# @vayo-hq/types
 
 Shared TypeScript interfaces for [Vayo](https://www.npmjs.com/package/vayo) — the
-data model every other `@vayo/*` package codes against (`CapturedSample`,
+data model every other `@vayo-hq/*` package codes against (`CapturedSample`,
 `EndpointDoc`, `ResolvedEndpoint`, `VayoDbAdapter`, and the rest of the
 `vayo_*` collection shapes).
 

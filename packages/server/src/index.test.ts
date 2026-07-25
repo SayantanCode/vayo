@@ -75,9 +75,9 @@ describe("createServer — httpServer / socketPath options", () => {
   });
 });
 
-describe("static UI serving (@vayo/ui's built bundle, dist-app/)", () => {
-  // Exercises the real @vayo/ui/dist-app built alongside this test run
-  // (`pnpm --filter @vayo/ui build`) — no auth needed, these routes serve
+describe("static UI serving (@vayo-hq/ui's built bundle, dist-app/)", () => {
+  // Exercises the real @vayo-hq/ui/dist-app built alongside this test run
+  // (`pnpm --filter @vayo-hq/ui build`) — no auth needed, these routes serve
   // the app shell itself, not data.
   it("serves the built index.html at mountPath, with the configured mountPath injected for main.tsx to read", async () => {
     const db = createFakeDb();

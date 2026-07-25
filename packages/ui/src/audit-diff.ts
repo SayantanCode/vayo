@@ -1,10 +1,10 @@
-// @vayo/ui — turns a raw AuditLogDoc (docs/03-data-model.md) into what the
+// @vayo-hq/ui — turns a raw AuditLogDoc (docs/03-data-model.md) into what the
 // History tab actually renders: a human-readable summary line plus a
 // leaf-level list of what changed. Pulled out as pure functions (no React,
 // no fetch) so the logic is unit-testable on its own, same pattern as
 // dot-path.ts/example-from-schema.ts in this package.
 
-import type { AuditAction, AuditLogDoc } from "@vayo/types";
+import type { AuditAction, AuditLogDoc } from "@vayo-hq/types";
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   override: "Manual edit",

@@ -1,4 +1,4 @@
-// @vayo/server — the header bell's feed (docs/06-realtime-collaboration.md
+// @vayo-hq/server — the header bell's feed (docs/06-realtime-collaboration.md
 // "Notifications").
 import { Router } from "express";
 import { requireRole, type VayoAuthedRequest } from "../auth-middleware.js";

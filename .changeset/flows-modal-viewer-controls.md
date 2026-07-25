@@ -1,5 +1,5 @@
 ---
-"@vayo/ui": patch
+"@vayo-hq/ui": patch
 ---
 
 Fixed: a viewer could type into a Flow's name, reorder/remove steps, and

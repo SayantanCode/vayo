@@ -1,6 +1,6 @@
 ---
-"@vayo/server": patch
-"@vayo/ui": patch
+"@vayo-hq/server": patch
+"@vayo-hq/ui": patch
 ---
 
 Fixed two bugs found during an end-to-end UI sweep against a real deployment:

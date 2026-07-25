@@ -1,4 +1,4 @@
-// @vayo/server — the per-endpoint History tab, and the full-project
+// @vayo-hq/server — the per-endpoint History tab, and the full-project
 // compliance/audit export (docs/01-vision-and-market.md "Segments this
 // honestly doesn't serve yet" — the audit-trail half of the enterprise
 // SSO/SOC2/audit-logs question).

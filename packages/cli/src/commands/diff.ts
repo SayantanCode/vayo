@@ -1,12 +1,12 @@
 // vayo — vayo diff: the same compileVersion + diffSpecs logic as
-// @vayo/server's GET /api/diff route, run directly against the DB so CI
+// @vayo-hq/server's GET /api/diff route, run directly against the DB so CI
 // doesn't need a running server just to gate a breaking change
 // (docs/07-api-versioning.md).
 
-import type { ResolvedEndpoint } from "@vayo/types";
-import { resolveEndpoint } from "@vayo/schema-engine";
-import { compile, diffSpecs } from "@vayo/openapi-compiler";
-import { createAdapter } from "@vayo/db-mongo";
+import type { ResolvedEndpoint } from "@vayo-hq/types";
+import { resolveEndpoint } from "@vayo-hq/schema-engine";
+import { compile, diffSpecs } from "@vayo-hq/openapi-compiler";
+import { createAdapter } from "@vayo-hq/db-mongo";
 import { requireMongoUri } from "../config.js";
 
 export interface DiffOptions {

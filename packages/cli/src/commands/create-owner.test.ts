@@ -6,7 +6,7 @@ const createTeamMember = vi.fn();
 const bcryptHash = vi.fn(async (password: string, _rounds: number) => `hashed:${password}`);
 const promptsMock = vi.fn();
 
-vi.mock("@vayo/db-mongo", () => ({
+vi.mock("@vayo-hq/db-mongo", () => ({
   createAdapter: () => ({
     getTeamMemberByEmail: (...args: unknown[]) => getTeamMemberByEmail(...args),
     createTeamMember: (...args: unknown[]) => createTeamMember(...args),

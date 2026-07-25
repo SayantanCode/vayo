@@ -1,4 +1,4 @@
-// @vayo/ui — the sidebar's drag-and-drop folder tree (docs/03-data-model.md
+// @vayo-hq/ui — the sidebar's drag-and-drop folder tree (docs/03-data-model.md
 // "Manual endpoints & folders"). dnd-kit's sortable preset operates on a
 // flat list, so nesting is expressed via each row's `depth`/`parentId`
 // (see `flattenTree` in ../types.ts), not by nesting DndContexts.
@@ -47,7 +47,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { ChevronDown, ChevronRight, FilePlus, Folder, FolderPlus, FoldVertical, Sparkles, Tag, UnfoldVertical } from "lucide-react";
-import type { FolderDoc } from "@vayo/types";
+import type { FolderDoc } from "@vayo-hq/types";
 import type { FlatTreeRow, TreeNode } from "../types.js";
 import { flattenTree } from "../types.js";
 import { ConfirmModal } from "./ConfirmModal.js";

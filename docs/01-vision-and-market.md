@@ -68,12 +68,12 @@ Vayo already does but hasn't said out loud?"
   contributable work, not a rearchitecture — the door is deliberately left
   open, just not walked through yet.
 - **Postgres-only teams unwilling to add MongoDB** — also a real gap (there is
-  only one adapter today, `@vayo/db-mongo`), but a narrower one than it looks:
-  `VayoDbAdapter` (`@vayo/types`) was audited end-to-end and contains **zero**
+  only one adapter today, `@vayo-hq/db-mongo`), but a narrower one than it looks:
+  `VayoDbAdapter` (`@vayo-hq/types`) was audited end-to-end and contains **zero**
   Mongo-specific types anywhere in its ~30 methods — every id is a plain
   `string`, the one binary-stream method (`downloadAttachment`) is typed
   `unknown` specifically so no adapter's concrete stream type leaks into the
-  shared interface. A `@vayo/db-postgres` implementing this same interface is
+  shared interface. A `@vayo-hq/db-postgres` implementing this same interface is
   genuinely viable future work, not a redesign — deliberately not attempted in
   this pass, since a rushed implementation of the data layer everything else
   depends on is a worse outcome than an honest "not built yet."

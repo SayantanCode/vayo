@@ -35,7 +35,7 @@ release, replayed against a throwaway Express app outside this repo.
 
 **Prerequisites:** Node 20+, your own MongoDB instance (Vayo never hosts
 data — BYODB is absolute, see `docs/00-README.md`), and **Express 4.x**.
-`@vayo/capture-express` pins `peerDependencies: { express: "^4.19.0" }` —
+`@vayo-hq/capture-express` pins `peerDependencies: { express: "^4.19.0" }` —
 v1 targets Express 4 only. A bare `npm install express` in a fresh project
 resolves to Express 5 today, which this range rejects; install
 `express@^4.19.0` explicitly. If something upstream of `capture()` ends up
@@ -50,7 +50,7 @@ a checkout of this repo and install them into your own project by path:
 # inside this repo
 pnpm install && pnpm build
 for pkg in types ast schema-engine openapi-compiler db-mongo capture-express server ui cli; do
-  pnpm --filter @vayo/$pkg pack --pack-destination /some/tarball/dir
+  pnpm --filter @vayo-hq/$pkg pack --pack-destination /some/tarball/dir
 done
 ```
 
@@ -59,8 +59,8 @@ done
 npm install /some/tarball/dir/vayo-*.tgz express@^4.19.0
 ```
 
-Once published, this collapses to `npm install @vayo/capture-express
-@vayo/db-mongo vayo express@^4`.
+Once published, this collapses to `npm install @vayo-hq/capture-express
+@vayo-hq/db-mongo vayo express@^4`.
 
 ### 1. Initialize
 
@@ -81,8 +81,8 @@ existing source files.
 call `app.listen()`:
 
 ```js
-const { capture } = require("@vayo/capture-express"); // or `import` for ESM
-const { createAdapter } = require("@vayo/db-mongo");
+const { capture } = require("@vayo-hq/capture-express"); // or `import` for ESM
+const { createAdapter } = require("@vayo-hq/db-mongo");
 const db = createAdapter(process.env.VAYO_MONGO_URI);
 app.use(capture({ db }));
 ```
@@ -137,8 +137,8 @@ running" question. Mount Vayo's Express app into yours, on the same
 `http.Server` your app already listens with:
 
 ```js
-const { createServer } = require("@vayo/server");
-const { createAdapter } = require("@vayo/db-mongo");
+const { createServer } = require("@vayo-hq/server");
+const { createAdapter } = require("@vayo-hq/db-mongo");
 
 const server = app.listen(3000); // your existing app.listen() call
 const db = createAdapter(process.env.VAYO_MONGO_URI);
@@ -204,7 +204,7 @@ sidebar — it isn't pushed live the way an edit to an existing endpoint is.
 - `pnpm audit`/`npm audit` on this repo's own dev toolchain (`vitest`/`vite`)
   reports a handful of findings — none of that is a `dependency` of any
   published package, so it never reaches a real install of
-  `@vayo/capture-express`/`@vayo/db-mongo`/etc. (`devDependencies` aren't
+  `@vayo-hq/capture-express`/`@vayo-hq/db-mongo`/etc. (`devDependencies` aren't
   installed for a package being consumed, only for the project at the root
   of an install). Worth a routine `vitest` version bump, not a launch blocker.
 

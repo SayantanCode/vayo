@@ -1,4 +1,4 @@
-// @vayo/ui — the API base URL + auth token every component that calls
+// @vayo-hq/ui — the API base URL + auth token every component that calls
 // `api.*` needs. Previously threaded as a `config={config}` prop into 11+
 // separate components from DocsApp.tsx; this is the one shared version.
 import { createContext, useContext, type ReactNode } from "react";

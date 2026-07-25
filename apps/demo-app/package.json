@@ -1,5 +1,5 @@
 {
-  "name": "@vayo/demo-app",
+  "name": "@vayo-hq/demo-app",
   "version": "0.0.0",
   "private": true,
   "description": "A small Express app used to prove the M1 capture pipeline against real traffic (docs/09-roadmap.md M1 done-when).",
@@ -16,12 +16,12 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@vayo/capture-express": "workspace:*",
-    "@vayo/db-mongo": "workspace:*",
-    "@vayo/ast": "workspace:*",
-    "@vayo/schema-engine": "workspace:*",
-    "@vayo/openapi-compiler": "workspace:*",
-    "@vayo/server": "workspace:*",
+    "@vayo-hq/capture-express": "workspace:*",
+    "@vayo-hq/db-mongo": "workspace:*",
+    "@vayo-hq/ast": "workspace:*",
+    "@vayo-hq/schema-engine": "workspace:*",
+    "@vayo-hq/openapi-compiler": "workspace:*",
+    "@vayo-hq/server": "workspace:*",
     "express": "^4.19.0",
     "bcrypt": "^6.0.0",
     "mongodb": "^6.8.0",

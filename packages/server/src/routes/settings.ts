@@ -1,4 +1,4 @@
-// @vayo/server — vayo_settings (project-wide title/description, the
+// @vayo-hq/server — vayo_settings (project-wide title/description, the
 // equivalent of swagger-jsdoc's options.definition.info, but editable
 // through the docs UI — docs/03-data-model.md).
 import { Router } from "express";

@@ -1,15 +1,15 @@
 // vayo — vayo export: compiles the resolved spec for a version and
 // writes it to disk, either as OpenAPI 3.1 (docs/09-roadmap.md M2 done-when)
 // or a Postman Collection v2.1 — the same logic apps/demo-app/src/export.ts
-// and @vayo/server's /api/export/postman route already prove independently.
+// and @vayo-hq/server's /api/export/postman route already prove independently.
 
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import type { ExampleDoc, ResolvedEndpoint, TestScriptDoc } from "@vayo/types";
-import { resolveEndpoint } from "@vayo/schema-engine";
-import { compile } from "@vayo/openapi-compiler";
-import { compilePostmanCollection } from "@vayo/server";
-import { createAdapter } from "@vayo/db-mongo";
+import type { ExampleDoc, ResolvedEndpoint, TestScriptDoc } from "@vayo-hq/types";
+import { resolveEndpoint } from "@vayo-hq/schema-engine";
+import { compile } from "@vayo-hq/openapi-compiler";
+import { compilePostmanCollection } from "@vayo-hq/server";
+import { createAdapter } from "@vayo-hq/db-mongo";
 import { requireMongoUri } from "../config.js";
 
 export interface ExportOptions {

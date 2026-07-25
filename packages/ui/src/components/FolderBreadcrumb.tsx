@@ -1,8 +1,8 @@
-// @vayo/ui — breadcrumb trail above the endpoint header, showing the
+// @vayo-hq/ui — breadcrumb trail above the endpoint header, showing the
 // folder chain the selected endpoint currently lives in (Postman-parity
 // redesign: makes deep nesting scannable without expanding the sidebar).
 
-import type { FolderDoc } from "@vayo/types";
+import type { FolderDoc } from "@vayo-hq/types";
 
 interface FolderBreadcrumbProps {
   folders: FolderDoc[];

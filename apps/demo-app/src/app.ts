@@ -1,5 +1,5 @@
 // apps/demo-app/src/app.ts — the plain Express app, with zero Vayo wiring.
-// This is what `@vayo/ast`'s static pass imports (docs/04-capture-engine.md
+// This is what `@vayo-hq/ast`'s static pass imports (docs/04-capture-engine.md
 // Step 2 #1: "a bootstrapped instance of the user's app") — express-list-
 // endpoints must see only the user's own routes/middleware, never Vayo's
 // own capture() middleware. src/index.ts wraps this with capture() + starts

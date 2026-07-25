@@ -1,12 +1,12 @@
-// @vayo/ui — synthesizes a plausible example value from a JSON Schema.
+// @vayo-hq/ui — synthesizes a plausible example value from a JSON Schema.
 // A UI-local counterpart to the server's `examplePayloadFromSchema`
 // (packages/server/src/postman-export.ts) — deliberately not imported
-// from there, since @vayo/ui only ever talks to @vayo/server's REST API,
+// from there, since @vayo-hq/ui only ever talks to @vayo-hq/server's REST API,
 // never its internals (docs/08-packages-and-repo-structure.md). Used only
 // as a fallback in the Details tab's code/response sample panels when no
 // real captured example exists yet for an endpoint.
 
-import type { JSONSchema } from "@vayo/types";
+import type { JSONSchema } from "@vayo-hq/types";
 
 export function exampleFromSchema(schema: JSONSchema | undefined | null): unknown {
   if (!schema) return null;

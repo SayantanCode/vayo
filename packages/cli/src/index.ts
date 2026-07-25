@@ -51,7 +51,7 @@ program
 
 program
   .command("serve")
-  .description("Run @vayo/server standalone against your MongoDB (standalone auth mode only)")
+  .description("Run @vayo-hq/server standalone against your MongoDB (standalone auth mode only)")
   .option("--port <port>", "port to listen on", "4100")
   .option("--mount <path>", "mount path", "/vayo")
   .action((opts) => serveCommand({ port: opts.port, mount: opts.mount }));

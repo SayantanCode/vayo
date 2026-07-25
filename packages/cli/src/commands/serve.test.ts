@@ -4,8 +4,8 @@ import { serveCommand } from "./serve.js";
 const createServer = vi.fn();
 const listen = vi.fn((_port: number, cb?: () => void) => cb?.());
 
-vi.mock("@vayo/server", () => ({ createServer: (...args: unknown[]) => createServer(...args) }));
-vi.mock("@vayo/db-mongo", () => ({ createAdapter: (uri: string) => ({ __mongoUri: uri }) }));
+vi.mock("@vayo-hq/server", () => ({ createServer: (...args: unknown[]) => createServer(...args) }));
+vi.mock("@vayo-hq/db-mongo", () => ({ createAdapter: (uri: string) => ({ __mongoUri: uri }) }));
 vi.mock("../config.js", () => ({ requireMongoUri: () => "mongodb://localhost:27017/vayo" }));
 
 const originalSecret = process.env.VAYO_SESSION_SECRET;

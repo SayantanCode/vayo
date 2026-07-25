@@ -10,7 +10,7 @@ This is the core differentiator. Get this right before touching the UI.
 | Infer/merge JSON Schema from real request/response samples | `genson-js` | `createSchema(sample)` and `mergeSchemas([...])` — exactly the "runtime capture → schema" mechanic. Pure JS, no native deps, works synchronously in a middleware without blocking the response. |
 | Static AST analysis (types from Zod/TS interfaces, JSDoc summaries) | `ts-morph` | Higher-level, more ergonomic API over the TS compiler than raw `@babel/parser` for this use case since we're reading types, not just syntax. |
 | OpenAPI 3.1 validation | `@apidevtools/swagger-parser` | Validates the compiled document is actually spec-valid before it's ever served — never ship an invalid spec, even internally. |
-| Version-to-version diffing | *(none — custom)* | `oasdiff` looked like the obvious reuse here but is Go-only (binaries/Docker/Homebrew, no npm/WASM), so `@vayo/openapi-compiler` implements its own small `diffSpecs`, scoped to exactly the rules in `07-api-versioning.md` rather than a general-purpose diff engine. |
+| Version-to-version diffing | *(none — custom)* | `oasdiff` looked like the obvious reuse here but is Go-only (binaries/Docker/Homebrew, no npm/WASM), so `@vayo-hq/openapi-compiler` implements its own small `diffSpecs`, scoped to exactly the rules in `07-api-versioning.md` rather than a general-purpose diff engine. |
 
 ## Step 1 — Runtime capture (the middleware)
 
@@ -43,13 +43,13 @@ Key decisions baked into `recordSample`:
 3. **Redaction before anything touches memory beyond the request handler.** See
    `05-security.md` §2 — this happens inside `recordSample`, before the sample
    ever reaches `genson-js` or the database.
-4. **Write path:** `recordSample` calls into `@vayo/schema-engine`'s
+4. **Write path:** `recordSample` calls into `@vayo-hq/schema-engine`'s
    `mergeCapturedSample(existing, newSample)`, then upserts through
-   `@vayo/db-mongo`. The middleware package itself never talks to MongoDB
+   `@vayo-hq/db-mongo`. The middleware package itself never talks to MongoDB
    directly — only through the db-adapter package (keeps `capture-express`
    swappable/testable without a real database).
 5. **Version tagging** (`07-api-versioning.md`). Every sample's normalized
-   path template is run through `@vayo/schema-engine`'s `resolveVersion` to
+   path template is run through `@vayo-hq/schema-engine`'s `resolveVersion` to
    decide which `EndpointDoc.version` bucket it belongs to, against
    `db.listApiVersions()`'s configured `basePathPattern`s. `recordSample`
    already runs after the response is sent (point 2 above), so `await`ing
@@ -71,7 +71,7 @@ user's source tree:
    `app.use("/api/products", router)`, so the router's own registration
    (`router.get("/:id", ...)`) only ever contains its path *relative to
    wherever it gets mounted* — never the full path `express-list-endpoints`
-   reports. `@vayo/ast` resolves this by tracing `X.use("/prefix", router)`
+   reports. `@vayo-hq/ast` resolves this by tracing `X.use("/prefix", router)`
    calls across the project's module graph (default-exported router,
    imported and mounted by identifier — the common convention) and joining
    each registration's relative path onto its router's resolved prefix
@@ -118,7 +118,7 @@ user's source tree:
    leading comment is often written for something else entirely (a TODO, a
    workaround note), and `@group`/`@deprecated` carry real behavioral
    weight, so an unrelated comment must never be misread as a declaration.
-   `autoOrganizeFolders` (`@vayo/db-mongo`) turns a "/"-separated `group`
+   `autoOrganizeFolders` (`@vayo-hq/db-mongo`) turns a "/"-separated `group`
    into real nested sidebar folders, creating (or reusing) one folder per
    segment; a flat, single-segment group still resolves to exactly the one
    top-level folder it always did. A "declared" grouping is treated as
@@ -154,7 +154,7 @@ user's source tree:
    two different "Users" groups under different parents would otherwise
    collide into one) plus a top-level `tags: [{name}, ...]` declaration
    listing every distinct group in first-appearance order
-   (`@vayo/openapi-compiler`'s `buildDocument`/`buildOperation`). Without
+   (`@vayo-hq/openapi-compiler`'s `buildDocument`/`buildOperation`). Without
    this, `x-vayo-group` alone would only ever group operations inside
    Vayo's own UI — the exported spec, opened in an actual third-party
    Swagger UI, Postman import, or Redoc, would show every operation in one
@@ -185,7 +185,7 @@ comment block as deliberately written for API-doc annotation rather than
 incidentally sitting above a route registration. Without it, none of
 `@group`/`@deprecated`/`@response`/`@example` are ever parsed, no matter
 what text appears in the comment — they're just prose, exactly as if the
-tag characters weren't there at all (`@vayo/ast`'s `hasVayoDocSentinel`).
+tag characters weren't there at all (`@vayo-hq/ast`'s `hasVayoDocSentinel`).
 This gate does **not** apply to the plain-text `summary` itself: a summary
 being "whatever the nearest comment says" is the existing,
 zero-annotation-required M1 behavior and carries no locking behavior, so
@@ -211,7 +211,7 @@ but a project that hasn't sent any traffic through `capture()` yet, and
 doesn't use Zod (or an equivalent) either, gets nothing from either source
 — a common combination, since plenty of real Express APIs validate through
 nothing more formal than their Mongoose model. When step 2 #3 above finds
-no Zod schema, `@vayo/ast` tries one more static
+no Zod schema, `@vayo-hq/ast` tries one more static
 convention before giving up: tracing the request body through a Mongoose
 model. Two forms, tried in that order, both requiring the handler to
 resolve to an actual function body first — following one cross-file hop
@@ -453,7 +453,7 @@ JavaScript from ever setting a `Cookie` request header manually — it's a
 error — so this isn't unwritten code, it's a browser platform restriction
 that a client-side `fetch()` can never work around. Testing a cookie-based
 endpoint requires an external tool (curl, Postman) for now. Fixing this
-properly would mean routing "Try It Now" requests through `@vayo/server`
+properly would mean routing "Try It Now" requests through `@vayo-hq/server`
 itself as a proxy (the server, not the browser, makes the real outbound
 request, so the `Cookie` header restriction doesn't apply) — a genuinely
 separate feature, not a quick add-on, because an authenticated user's
@@ -497,7 +497,7 @@ finding the endpoint again is reason enough to clear it.
 Once flagged, the "it'll just reappear" objection to deleting a captured
 endpoint no longer holds, so the delete route (`05-security.md`) allows
 removing it — same as a manual placeholder. The compiled spec carries the
-flag as `x-vayo-possibly-removed-since` (one of `@vayo/openapi-compiler`'s
+flag as `x-vayo-possibly-removed-since` (one of `@vayo-hq/openapi-compiler`'s
 `x-vayo-*` extension constants) so the UI can show a "this route may no
 longer exist" banner and unlock the Delete option in the sidebar without a
 second round-trip.
@@ -507,7 +507,7 @@ second round-trip.
 `express-list-endpoints` already returns each route's middleware functions **in
 registration order** — this is captured once into `EndpointDoc.middlewareChain`
 (`03-data-model.md`) during the static pass, no new capture mechanism required.
-The Flowmap tab (`@vayo/ui`) renders this directly as a linear flow:
+The Flowmap tab (`@vayo-hq/ui`) renders this directly as a linear flow:
 
 ```text
 Client request → rateLimiter → authenticate → validateBody → [handler] → response

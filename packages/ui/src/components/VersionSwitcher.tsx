@@ -1,11 +1,11 @@
-// @vayo/ui — header dropdown for picking the active API version
+// @vayo-hq/ui — header dropdown for picking the active API version
 // (docs/07-api-versioning.md). Includes a permanent "Unversioned" entry —
 // captured traffic that matched no configured basePathPattern lands there,
 // and it should stay reachable even when empty, same as any other version.
 
 import { useRef, useState } from "react";
 import { ChevronDown, GitBranch, GitCompare, Settings } from "lucide-react";
-import type { ApiVersionDoc } from "@vayo/types";
+import type { ApiVersionDoc } from "@vayo-hq/types";
 import { useDismiss } from "../hooks/useDismiss.js";
 
 interface VersionSwitcherProps {

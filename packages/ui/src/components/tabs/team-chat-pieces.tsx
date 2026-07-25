@@ -1,10 +1,10 @@
-// @vayo/ui — small, self-contained pieces used by TeamChatTab, extracted
+// @vayo-hq/ui — small, self-contained pieces used by TeamChatTab, extracted
 // out of that file since none of them need its state: a right-click message
 // context menu, the date/time jump popover, an attachment renderer, and the
 // snippet-truncation helper shared by reply-quote previews.
 import { useRef, useState } from "react";
 import { Copy, CornerUpLeft, Download, File, Flag } from "lucide-react";
-import type { AttachmentDoc } from "@vayo/types";
+import type { AttachmentDoc } from "@vayo-hq/types";
 import { useDismiss } from "../../hooks/useDismiss.js";
 
 export function snippet(body: string, max: number): string {

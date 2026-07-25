@@ -1,10 +1,10 @@
-// @vayo/ui — pure request/response helpers + small presentational pieces
+// @vayo-hq/ui — pure request/response helpers + small presentational pieces
 // for TryItNowTab, extracted out of that file specifically because none of
 // this needs the main component's state: response format detection/
 // pretty-printing, path/URL matching, and the two response-view renderers
 // (table view, search-match highlighting) are all pure functions of their
 // own arguments. Tested directly (TryItNowTab.test.ts) against this module.
-import type { ExampleDoc } from "@vayo/types";
+import type { ExampleDoc } from "@vayo-hq/types";
 
 export type BodyMode = "none" | "raw" | "form-data" | "urlencoded";
 export type AuthMode = "none" | "bearer" | "basic" | "apiKey";

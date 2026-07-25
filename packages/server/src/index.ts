@@ -1,4 +1,4 @@
-// @vayo/server
+// @vayo-hq/server
 // REST API + Socket.IO gateway + static UI hosting.
 // Every mutating route MUST be wrapped in requireRole — docs/05-security.md §4.
 // Realtime event contract — docs/06-realtime-collaboration.md.
@@ -11,7 +11,7 @@ import express, { type Request, type Response } from "express";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import { Server as SocketIOServer } from "socket.io";
-import { type VayoDbAdapter } from "@vayo/types";
+import { type VayoDbAdapter } from "@vayo-hq/types";
 import { autoCatchAsyncErrors, errorHandler } from "./error-handling.js";
 import { resolveAuth } from "./auth-middleware.js";
 import type { AuthResult, VayoAuthedRequest } from "./auth-middleware.js";
@@ -37,7 +37,7 @@ import { createTeamRouter } from "./routes/team.js";
 
 // Re-exported so vayo's `vayo export --format postman` can compile a
 // collection directly against the DB, without needing a running server —
-// the same reason `compile`/`diffSpecs` from @vayo/openapi-compiler are
+// the same reason `compile`/`diffSpecs` from @vayo-hq/openapi-compiler are
 // already usable that way (both re-exported the same way from
 // routes/versions.js's own dependencies).
 export { compilePostmanCollection, compilePostmanEnvironment } from "./postman-export.js";
@@ -107,7 +107,7 @@ export interface VayoServerHandle {
  * Socket.IO server (almost certainly still at ITS default path) when both
  * share one httpServer (`options.httpServer`, above). Normalizes a root
  * mountPath ("/" or "") so the result is never a doubled slash. Duplicated
- * in @vayo/ui's socket.ts — same reasoning as routes/comments.ts's
+ * in @vayo-hq/ui's socket.ts — same reasoning as routes/comments.ts's
  * extractMentionedMemberIds/extractTaggedVayoIds: the two packages don't
  * depend on each other, and a string transform this small isn't worth
  * sharing a package over. */
@@ -120,7 +120,7 @@ export function createServer(options: ServerOptions): VayoServerHandle {
   const sessionSecret = options.sessionSecret ?? process.env.VAYO_SESSION_SECRET;
   if (!sessionSecret) {
     throw new Error(
-      "@vayo/server: sessionSecret (or VAYO_SESSION_SECRET env var) is required in both auth modes — used to HMAC-hash session and invite tokens (docs/05-security.md §5).",
+      "@vayo-hq/server: sessionSecret (or VAYO_SESSION_SECRET env var) is required in both auth modes — used to HMAC-hash session and invite tokens (docs/05-security.md §5).",
     );
   }
 
@@ -290,10 +290,10 @@ export function createServer(options: ServerOptions): VayoServerHandle {
   // ---- team / invites ----
   app.use(mountPath, router);
 
-  // Serves @vayo/ui's built bundle (dist/index.html + dist/assets/*) at the
+  // Serves @vayo-hq/ui's built bundle (dist/index.html + dist/assets/*) at the
   // same mountPath the API lives under — this is what makes `vayo serve`
   // (or createServer() mounted into a host app) an actual browsable docs
-  // site, not just a JSON API. `@vayo/ui`'s own vite.config.ts sets
+  // site, not just a JSON API. `@vayo-hq/ui`'s own vite.config.ts sets
   // `base: "./"` specifically so this same build works under any
   // mountPath; the one piece a static build can't know ahead of time is
   // *which* mountPath a given deployment chose, so it's injected into
@@ -301,14 +301,14 @@ export function createServer(options: ServerOptions): VayoServerHandle {
   // packages/ui/src/main.tsx) rather than baked in at build time.
   //
   // Resolved lazily and tolerated if missing — `vayo serve` against a copy
-  // of @vayo/ui that was only `tsc -b`'d (library output) and never
+  // of @vayo-hq/ui that was only `tsc -b`'d (library output) and never
   // `vite build`'t (the bundled dist/index.html) still starts up as an
   // API-only server rather than crashing, the same "never let a missing
   // optional piece take down the real service" posture as capture's own
   // error handling.
   try {
-    const uiPackageDir = path.dirname(require.resolve("@vayo/ui/package.json"));
-    // dist-app/, not dist/ — @vayo/ui's vite.config.ts builds the
+    const uiPackageDir = path.dirname(require.resolve("@vayo-hq/ui/package.json"));
+    // dist-app/, not dist/ — @vayo-hq/ui's vite.config.ts builds the
     // standalone SPA bundle there specifically so it never collides with
     // dist/index.js, the library entry point (this package's own
     // main/types fields).
@@ -331,7 +331,7 @@ export function createServer(options: ServerOptions): VayoServerHandle {
       });
     }
   } catch {
-    // @vayo/ui not installed/built alongside this server — API-only, same
+    // @vayo-hq/ui not installed/built alongside this server — API-only, same
     // as before this feature existed.
   }
 

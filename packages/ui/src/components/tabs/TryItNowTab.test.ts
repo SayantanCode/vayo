@@ -14,7 +14,7 @@ import {
   prettyPrintBody,
   prettyPrintXml,
 } from "./try-it-now-utils.js";
-import type { ExampleDoc } from "@vayo/types";
+import type { ExampleDoc } from "@vayo-hq/types";
 
 describe("pathSegmentsMatch", () => {
   it("matches a captured path with {param} placeholders against a literal path", () => {

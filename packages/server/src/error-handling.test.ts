@@ -19,7 +19,7 @@ describe("autoCatchAsyncErrors + errorHandler", () => {
     });
     // A route with non-async middleware ahead of the async handler — proves
     // wrapping every handler in the chain doesn't break a normal multi-
-    // middleware route (the shape every real @vayo/server route actually is:
+    // middleware route (the shape every real @vayo-hq/server route actually is:
     // requireRole, then an async body).
     router.post("/with-middleware", (_req, _res, next) => next(), async () => {
       throw new Error("boom (after sync middleware)");

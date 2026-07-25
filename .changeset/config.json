@@ -4,14 +4,14 @@
   "commit": false,
   "fixed": [
     [
-      "@vayo/types",
-      "@vayo/ast",
-      "@vayo/schema-engine",
-      "@vayo/openapi-compiler",
-      "@vayo/db-mongo",
-      "@vayo/capture-express",
-      "@vayo/server",
-      "@vayo/ui",
+      "@vayo-hq/types",
+      "@vayo-hq/ast",
+      "@vayo-hq/schema-engine",
+      "@vayo-hq/openapi-compiler",
+      "@vayo-hq/db-mongo",
+      "@vayo-hq/capture-express",
+      "@vayo-hq/server",
+      "@vayo-hq/ui",
       "vayo"
     ]
   ],
@@ -19,5 +19,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@vayo/demo-app"]
+  "ignore": ["@vayo-hq/demo-app"]
 }

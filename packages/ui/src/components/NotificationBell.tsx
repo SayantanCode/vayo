@@ -1,11 +1,11 @@
-// @vayo/ui — header bell: the notification center for real changes across
+// @vayo-hq/ui — header bell: the notification center for real changes across
 // the whole API surface (docs/06-realtime-collaboration.md "Notifications").
 // Automatic-only for v1 — overrides, schema changes, comments, version
 // status changes. No hand-authored announcements (a deliberate scope call).
 
 import { useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
-import type { NotificationDoc, NotificationType } from "@vayo/types";
+import type { NotificationDoc, NotificationType } from "@vayo-hq/types";
 import { api } from "../api.js";
 import type { EndpointSummary } from "../types.js";
 import { timeAgo } from "../time-format.js";

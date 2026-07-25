@@ -1,4 +1,4 @@
-// @vayo/server — the dependency bag every resource router receives from
+// @vayo-hq/server — the dependency bag every resource router receives from
 // createServer(). `io` is included alongside `db`/`sessionSecret` because
 // several REST routes also broadcast a realtime event right after their own
 // DB write succeeds — not just the Socket.IO event handlers in realtime.ts
@@ -6,7 +6,7 @@
 // source of truth" — the REST write and the broadcast happen in the same
 // handler, one right after the other).
 import type { Request } from "express";
-import type { VayoDbAdapter } from "@vayo/types";
+import type { VayoDbAdapter } from "@vayo-hq/types";
 import type { Server as SocketIOServer } from "socket.io";
 import type { AuthResult } from "./auth-middleware.js";
 

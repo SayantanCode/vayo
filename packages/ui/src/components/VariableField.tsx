@@ -1,4 +1,4 @@
-// @vayo/ui — a CodeMirror-backed text field that understands `{{variable}}`
+// @vayo-hq/ui — a CodeMirror-backed text field that understands `{{variable}}`
 // tokens against the active environment: tokens are colored inline
 // (green if resolvable, red if not — Postman's own convention), hovering a
 // red token surfaces an "Unresolved Variable" popover with an add-variable

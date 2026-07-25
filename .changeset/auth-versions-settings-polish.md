@@ -1,9 +1,9 @@
 ---
-"@vayo/types": patch
-"@vayo/db-mongo": patch
-"@vayo/openapi-compiler": patch
-"@vayo/server": patch
-"@vayo/ui": patch
+"@vayo-hq/types": patch
+"@vayo-hq/db-mongo": patch
+"@vayo-hq/openapi-compiler": patch
+"@vayo-hq/server": patch
+"@vayo-hq/ui": patch
 ---
 
 Several launch-readiness improvements, requested together:

@@ -1,10 +1,10 @@
-// @vayo/capture-express
+// @vayo-hq/capture-express
 // The ONLY Vayo package allowed to import express types. See
 // docs/04-capture-engine.md Step 1 and docs/05-security.md §2.
 
 import type { Request, RequestHandler, Response } from "express";
-import type { CapturedSample, VayoDbAdapter } from "@vayo/types";
-import { resolveVersion } from "@vayo/schema-engine";
+import type { CapturedSample, VayoDbAdapter } from "@vayo-hq/types";
+import { resolveVersion } from "@vayo-hq/schema-engine";
 
 /** Default redaction deny-list — docs/05-security.md §2. Additive via
  * CaptureOptions.redact, never replaced. */
@@ -59,7 +59,7 @@ export function redact(value: unknown, patterns: RegExp[], state?: { redacted: b
  * has `req.route.path === "/"`, so the naive concatenation produces
  * `/api/widgets/` — a spurious trailing slash that never matches the same
  * endpoint's real path anywhere else (the static AST pass's own
- * mount-prefix resolution, `@vayo/ast`'s `joinMountedPath`, hits this exact
+ * mount-prefix resolution, `@vayo-hq/ast`'s `joinMountedPath`, hits this exact
  * case and special-cases it the same way). Only ever strips *one* trailing
  * slash and never touches the literal root path `"/"` itself. */
 export function buildPathTemplate(req: Request): string | null {
@@ -247,7 +247,7 @@ export function unsupportedExpressVersionWarning(installedVersion: string): stri
   const major = Number(installedVersion.split(".")[0]);
   if (major === 4) return null;
   return (
-    `vayo: @vayo/capture-express expects Express 4.x ("express": "^4.19.0") but found Express ${installedVersion} installed. ` +
+    `vayo: @vayo-hq/capture-express expects Express 4.x ("express": "^4.19.0") but found Express ${installedVersion} installed. ` +
     "Express 5 changed router internals (path matching, middleware stack shape) this package hasn't been verified against " +
     "— captured route paths or middleware chains may be wrong or missing. Install express@^4.19.0."
   );

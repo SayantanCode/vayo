@@ -12,7 +12,7 @@ resolves to Express 5, which this rejects — install `express@^4.19.0`
 explicitly).
 
 ```bash
-npm install vayo @vayo/capture-express @vayo/db-mongo express@^4.19.0
+npm install vayo @vayo-hq/capture-express @vayo-hq/db-mongo express@^4.19.0
 ```
 
 ## Quickstart
@@ -34,8 +34,8 @@ automatically. Never touches your existing source files.
 call `app.listen()`:
 
 ```js
-const { capture } = require("@vayo/capture-express"); // or `import` for ESM
-const { createAdapter } = require("@vayo/db-mongo");
+const { capture } = require("@vayo-hq/capture-express"); // or `import` for ESM
+const { createAdapter } = require("@vayo-hq/db-mongo");
 const db = createAdapter(process.env.VAYO_MONGO_URI);
 app.use(capture({ db }));
 ```
@@ -56,7 +56,7 @@ npx vayo create-owner --email you@example.com --name "Your Name" --password "...
 ```
 
 Skip this if you're using delegated auth (validating your own app's
-session instead — see [`@vayo/server`](https://www.npmjs.com/package/@vayo/server)).
+session instead — see [`@vayo-hq/server`](https://www.npmjs.com/package/@vayo-hq/server)).
 
 ### 5. Serve your docs
 

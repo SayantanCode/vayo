@@ -1,10 +1,10 @@
-// @vayo/server — vayo_overrides: the diff-layer that lets a human correct
+// @vayo-hq/server — vayo_overrides: the diff-layer that lets a human correct
 // the auto-generated baseline without ever mutating the underlying captured
 // data (docs/03-data-model.md, constraint #3 "overrides are additive, never
 // destructive").
 import { Router } from "express";
 import { z } from "zod";
-import type { AuditAction, VayoDbAdapter } from "@vayo/types";
+import type { AuditAction, VayoDbAdapter } from "@vayo-hq/types";
 import { requireRole, type VayoAuthedRequest } from "../auth-middleware.js";
 import { autoCatchAsyncErrors } from "../error-handling.js";
 import type { RouteDeps } from "../server-deps.js";

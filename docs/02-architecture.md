@@ -5,14 +5,14 @@
 ```mermaid
 flowchart LR
     subgraph UserApp["User's Express App"]
-        R[Routes] --- MW["@vayo/capture-express\n(middleware)"]
+        R[Routes] --- MW["@vayo-hq/capture-express\n(middleware)"]
     end
 
     subgraph Static["Build-time / CLI"]
-        AST["@vayo/ast\n(ts-morph static scan)"]
+        AST["@vayo-hq/ast\n(ts-morph static scan)"]
     end
 
-    subgraph Core["@vayo/schema-engine + @vayo/openapi-compiler"]
+    subgraph Core["@vayo-hq/schema-engine + @vayo-hq/openapi-compiler"]
         MERGE[Merge captured + static + overrides]
         COMPILE[Compile to OpenAPI 3.1 + x-vayo-*]
     end
@@ -21,12 +21,12 @@ flowchart LR
         DB[(endpoints, overrides,\nexamples, comments,\nteam_members, api_versions)]
     end
 
-    subgraph Serve["@vayo/server (self-hosted)"]
+    subgraph Serve["@vayo-hq/server (self-hosted)"]
         API[REST + resolver]
         WS[Socket.IO gateway]
     end
 
-    subgraph Client["@vayo/ui (React)"]
+    subgraph Client["@vayo-hq/ui (React)"]
         UI[Schema-driven docs UI]
     end
 
@@ -75,9 +75,9 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Dev as Teammate (browser)
-    participant UI as @vayo/ui
-    participant API as @vayo/server REST
-    participant WS as @vayo/server Socket.IO
+    participant UI as @vayo-hq/ui
+    participant API as @vayo-hq/server REST
+    participant WS as @vayo-hq/server Socket.IO
     participant DB as MongoDB
 
     Dev->>UI: opens /vayo
@@ -104,7 +104,7 @@ emit the same generic format; it never touches the compiler or UI.
 
 ## Deployment shape (v1)
 
-Single Node.js process runs `@vayo/server`, which:
+Single Node.js process runs `@vayo-hq/server`, which:
 
 - serves the REST API,
 - serves the built React UI as static assets,
@@ -117,7 +117,7 @@ directly into their own already-running Express app and `http.Server` via
 `app.use("/docs", swaggerUi.serve, swaggerUi.setup(spec))` — or as a
 separate process pointed at the same database (`vayo serve`); both are
 supported, and neither requires a second port for the in-process case. See
-`08-packages-and-repo-structure.md` for the `@vayo/server` contract covering
+`08-packages-and-repo-structure.md` for the `@vayo-hq/server` contract covering
 both modes, and `06-realtime-collaboration.md` for how the Socket.IO gateway
 avoids colliding with a host app's own WebSocket server when the two share
 one `http.Server`.

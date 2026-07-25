@@ -8,11 +8,11 @@ const resolveEndpoint = vi.fn();
 const compile = vi.fn();
 const diffSpecs = vi.fn();
 
-vi.mock("@vayo/db-mongo", () => ({
+vi.mock("@vayo-hq/db-mongo", () => ({
   createAdapter: () => ({ listApiVersions, listEndpoints, listOverrides }),
 }));
-vi.mock("@vayo/schema-engine", () => ({ resolveEndpoint: (...args: unknown[]) => resolveEndpoint(...args) }));
-vi.mock("@vayo/openapi-compiler", () => ({
+vi.mock("@vayo-hq/schema-engine", () => ({ resolveEndpoint: (...args: unknown[]) => resolveEndpoint(...args) }));
+vi.mock("@vayo-hq/openapi-compiler", () => ({
   compile: (...args: unknown[]) => compile(...args),
   diffSpecs: (...args: unknown[]) => diffSpecs(...args),
 }));

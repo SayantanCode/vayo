@@ -61,4 +61,4 @@ doc contradicts one of these, the future doc is wrong, not this list.
 - **Primary database:** MongoDB (native driver, not Mongoose — see
   `03-data-model.md` for why).
 - **UI:** fully custom React, schema-driven, no third-party renderer dependency.
-- **Realtime:** Socket.IO, embedded in `@vayo/server`, single process for v1.
+- **Realtime:** Socket.IO, embedded in `@vayo-hq/server`, single process for v1.

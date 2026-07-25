@@ -1,4 +1,4 @@
-// @vayo/ui — Try It Now's "Scripts" sub-tab: pre-request/test script
+// @vayo-hq/ui — Try It Now's "Scripts" sub-tab: pre-request/test script
 // editors backing the sandboxed run wired into TryItNowTab's send().
 
 import { useState } from "react";

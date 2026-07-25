@@ -1,5 +1,5 @@
 ---
-"@vayo/ui": patch
+"@vayo-hq/ui": patch
 ---
 
 Extended the previous stale-error-banner fix to the two other places

@@ -1,10 +1,10 @@
 ---
-"@vayo/types": patch
-"@vayo/schema-engine": patch
-"@vayo/db-mongo": patch
-"@vayo/openapi-compiler": patch
-"@vayo/server": patch
-"@vayo/ui": patch
+"@vayo-hq/types": patch
+"@vayo-hq/schema-engine": patch
+"@vayo-hq/db-mongo": patch
+"@vayo-hq/openapi-compiler": patch
+"@vayo-hq/server": patch
+"@vayo-hq/ui": patch
 "vayo": patch
 ---
 

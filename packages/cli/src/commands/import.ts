@@ -5,14 +5,14 @@
 // comparison: Vayo's differentiator is exactly that a human doesn't have
 // to author/import a spec for it to work — capture/scan stay the sole
 // source of truth for *what exists*; import only ever adds descriptive
-// content on top). See @vayo/openapi-compiler's planOpenApiImport for the
+// content on top). See @vayo-hq/openapi-compiler's planOpenApiImport for the
 // pure planning logic this command turns into real writes.
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type { VayoDbAdapter } from "@vayo/types";
-import { planOpenApiImport, type ImportableEndpointRef } from "@vayo/openapi-compiler";
-import { createAdapter } from "@vayo/db-mongo";
+import type { VayoDbAdapter } from "@vayo-hq/types";
+import { planOpenApiImport, type ImportableEndpointRef } from "@vayo-hq/openapi-compiler";
+import { createAdapter } from "@vayo-hq/db-mongo";
 import { requireMongoUri } from "../config.js";
 
 export interface ImportOptions {
@@ -25,7 +25,7 @@ export interface ImportOptions {
 const IMPORT_ACTOR = "system:cli-import";
 
 /** Writes one override without the per-field notification `applyOverride`
- * (@vayo/server) creates on every human-triggered write — a bulk import
+ * (@vayo-hq/server) creates on every human-triggered write — a bulk import
  * setting summary/description/schema-field descriptions across every
  * matched endpoint would otherwise flood the notification bell with one
  * "updated X" entry per field per endpoint. Still audit-logged

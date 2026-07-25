@@ -1,10 +1,10 @@
-// @vayo/ui — header dropdown for picking the active environment. The
+// @vayo-hq/ui — header dropdown for picking the active environment. The
 // active environment's variables feed Try It Now's {{var}} interpolation
 // (docs/03-data-model.md "Environments & variables").
 
 import { useRef, useState } from "react";
 import { ChevronDown, Globe, Settings } from "lucide-react";
-import type { EnvironmentDoc } from "@vayo/types";
+import type { EnvironmentDoc } from "@vayo-hq/types";
 import { useDismiss } from "../hooks/useDismiss.js";
 
 interface EnvironmentSwitcherProps {

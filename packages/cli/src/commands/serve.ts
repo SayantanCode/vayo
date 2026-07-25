@@ -1,11 +1,11 @@
-// vayo — vayo serve: runs @vayo/server standalone against the same
+// vayo — vayo serve: runs @vayo-hq/server standalone against the same
 // MongoDB the user's capture middleware writes to. Standalone auth mode
 // only — delegated auth (ServerOptions.authMiddleware) needs code specific
 // to the user's own auth system, which a CLI can't generically prompt into
 // existence.
 
-import { createServer } from "@vayo/server";
-import { createAdapter } from "@vayo/db-mongo";
+import { createServer } from "@vayo-hq/server";
+import { createAdapter } from "@vayo-hq/db-mongo";
 import { requireMongoUri } from "../config.js";
 
 export interface ServeOptions {

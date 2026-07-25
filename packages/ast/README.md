@@ -1,4 +1,4 @@
-# @vayo/ast
+# @vayo-hq/ast
 
 Vayo's static analysis pass — the part of `vayo scan` that reads your
 Express app's source without needing any traffic first.
@@ -12,7 +12,7 @@ layout, and — when your project uses Zod or a plain Mongoose model — a
 best-effort request body schema, all without executing a single request.
 
 ```ts
-import { scanProject, type VayoConfig } from "@vayo/ast";
+import { scanProject, type VayoConfig } from "@vayo-hq/ast";
 
 const config: VayoConfig = { appEntryPath: "./src/app.js" };
 const { routes } = await scanProject(process.cwd(), config);

@@ -1,5 +1,5 @@
 ---
-"@vayo/ast": patch
+"@vayo-hq/ast": patch
 ---
 
 Fixed `@response <status> <SchemaName>` failing to resolve a schema

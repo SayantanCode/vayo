@@ -14,7 +14,7 @@ const appendAuditLog = vi.fn();
 const listExamples = vi.fn();
 const pinExample = vi.fn();
 
-vi.mock("@vayo/db-mongo", () => ({
+vi.mock("@vayo-hq/db-mongo", () => ({
   createAdapter: () => ({
     listEndpoints,
     listEnvironments,
