@@ -1,5 +1,56 @@
 # vayo
 
+## 0.1.1-beta.1
+
+### Patch Changes
+
+- a9282c3: Fixed `vayo import` silently dropping `info.contact`/`info.license`/
+  `info.termsOfService` from the imported spec. `planOpenApiImport` only
+  ever extracted `title`/`description`, predating this session's earlier
+  addition of the rest of OpenAPI's standard `info` object to Project
+  Settings — found while verifying the import feature end-to-end: title
+  and description updated correctly, but contact/license/termsOfService
+  silently stayed untouched even though `vayo import`'s own CLI command
+  already writes those exact `SettingsDoc` fields. `planOpenApiImport` now
+  extracts all three (dropping an incomplete license with no name, same as
+  `compile()` itself already does), and `vayo import` passes them through.
+- ae623af: Renamed the CLI package from the bare `vayo` to `@vayo-hq/cli` — the
+  first real `npm publish` of all 9 packages succeeded for the other 8, but
+  npm rejected `vayo` as a first-time publish for looking "too similar to
+  existing packages" (`yo`, `vant`, `vary`, `vaul`, `nano`, `pako`), an
+  anti-typosquatting check that only applies to unscoped names. The actual
+  CLI command stays exactly `vayo <command>` either way — the `bin` field
+  (`"vayo": "dist/index.js"`) is unaffected by the package's own name.
+  Install as `npm install -g @vayo-hq/cli`.
+- 04879f9: Renamed the npm scope from `@vayo` to `@vayo-hq` — the `@vayo` organization
+  name was already taken on npmjs.com by an unrelated party, discovered while
+  setting up npm Trusted Publishing ahead of the first real publish. No
+  package was ever actually published under the old scope (every `@vayo/*`
+  name still 404s on the registry), so this is a pure rename with zero real
+  consumers to break: `npm install @vayo-hq/types`, `npm install
+@vayo-hq/server`, etc. The bare `vayo` CLI package (no scope) is unaffected
+  either way.
+- 130aa3e: Updated READMEs to document capabilities that had landed in code but never
+  made it into the package docs: `@vayo-hq/ast`'s optional JSDoc tags
+  (`@group`/`@deprecated`/`@response`/`@example`/`@description`),
+  `@vayo-hq/openapi-compiler`'s `compile()` `title`/`description`/`servers`
+  options and `planOpenApiImport`, `@vayo-hq/ui`'s Coverage/Flows/Settings/Chat/
+  Export surfaces, and the `vayo` CLI's `vayo import` command.
+- Updated dependencies [c8cd29c]
+- Updated dependencies [13800e0]
+- Updated dependencies [8082701]
+- Updated dependencies [a9282c3]
+- Updated dependencies [d87f5ae]
+- Updated dependencies [04879f9]
+- Updated dependencies [4a677a6]
+- Updated dependencies [130aa3e]
+  - @vayo-hq/types@0.1.1-beta.1
+  - @vayo-hq/db-mongo@0.1.1-beta.1
+  - @vayo-hq/openapi-compiler@0.1.1-beta.1
+  - @vayo-hq/server@0.1.1-beta.1
+  - @vayo-hq/ast@0.1.1-beta.1
+  - @vayo-hq/schema-engine@0.1.1-beta.1
+
 ## 0.1.1-beta.0
 
 ### Patch Changes

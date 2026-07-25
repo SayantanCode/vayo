@@ -1,5 +1,96 @@
 # @vayo/server
 
+## 0.1.1-beta.1
+
+### Patch Changes
+
+- c8cd29c: Several launch-readiness improvements, requested together:
+
+  - **Sign-out now confirms first.** A single click used to sign out
+    immediately; it now opens the same confirm dialog other destructive
+    actions (delete endpoint/folder) already use.
+  - **"Remember this device" on login.** Unchecked, the session token is
+    kept in `sessionStorage` (cleared when the tab/browser closes) instead of
+    `localStorage`, and the server issues a shorter-lived session (24h vs
+    30 days) to match.
+  - **Creating a duplicate API version name failed silently.** `POST
+/api/versions` had a unique index but no pre-check, so a second `v1`
+    threw an uncaught, unhandled 500 with zero UI feedback. Now returns a
+    clean 409 ("API version \"v1\" already exists.") shown in the same
+    global error banner every other create/delete failure already uses, and
+    the form's input is preserved instead of vanishing.
+  - **A saved project description was never shown anywhere in the docs UI**
+    — only in the exported spec's JSON. It's now rendered at the top of
+    Full Docs mode, the same "info block above the operation list" every
+    third-party OpenAPI renderer (Redoc, Swagger UI) already does.
+  - **Project settings gained contact/license/termsOfService** — the rest of
+    OpenAPI's standard `info` object, filling out what was previously just
+    title/description.
+  - **Fixed a real bug found while testing the above**: OpenAPI 3.1's
+    License Object requires `url` (or an SPDX `identifier`) alongside
+    `name` — a license name entered with no URL made the _entire_ compiled
+    spec fail its own validation, breaking `/api/spec` and the whole docs UI
+    outright. `compile()` now silently omits an incomplete license instead
+    of ever producing an invalid document.
+
+- 13800e0: Fixed two bugs found during an end-to-end UI sweep against a real deployment:
+
+  - **Try It Now was silently broken by the docs server's own CSP.** The
+    `helmet` config set `connectSrc: ["'self'"]`, which makes the browser
+    refuse to even attempt a cross-origin `fetch()` — the docs UI and the
+    actual API being documented are almost always different origins (a
+    different port in dev, a different subdomain in prod). The Try It Now
+    tab's own error hint blamed this on CORS or an unreachable server, since
+    nobody had connected it back to the docs server's own CSP header. `connect-src`
+    is now unrestricted, since the primary anti-exfiltration defense
+    (`script-src`) is unaffected and there's no way to allow-list in advance
+    the arbitrary base URLs a team adds to their own Environments.
+  - **A stale "unauthorized" error banner survived a successful login.**
+    If the browser's stored session token was invalid (e.g. expired, or a
+    session-secret rotation) when the app first loaded, the initial spec/folders
+    fetch would fail and set a persistent error banner — which then never
+    cleared even after the user signed back in and every subsequent fetch
+    succeeded, since nothing reset it on success.
+
+- 8082701: Found while dry-run verifying the first real publish: `@vayo-hq/server`'s
+  `files` field excluded `*.test.js`/`*.test.d.ts` but not
+  `test-helpers/fakeDb.js` — a ~24KB in-memory fake DB adapter that exists
+  solely for this package's own tests, not something any real consumer
+  needs. Excluded it explicitly; every other package's `files` field was
+  checked and none has an equivalent test-support directory.
+- d87f5ae: Fixed a real permission gap found during a full viewer-role audit:
+  `POST /api/examples/:vayoId/pin` was gated at `requireRole("viewer")`,
+  letting a read-only team member permanently pin an example that then
+  compiles into the exported OpenAPI spec — a genuine content mutation
+  (`docs/05-security.md`'s "editor owns every content mutation" model),
+  not a read-only or self-service action, and inconsistent with this same
+  route's own `DELETE /api/examples/:id` (already `requireRole("editor")`).
+  The docs UI already hides the "pin" action from a viewer, but that was
+  only ever the courtesy layer — the route itself accepted it from any
+  authenticated viewer hitting the API directly. Now requires `editor`,
+  matching its sibling delete route.
+- 04879f9: Renamed the npm scope from `@vayo` to `@vayo-hq` — the `@vayo` organization
+  name was already taken on npmjs.com by an unrelated party, discovered while
+  setting up npm Trusted Publishing ahead of the first real publish. No
+  package was ever actually published under the old scope (every `@vayo/*`
+  name still 404s on the registry), so this is a pure rename with zero real
+  consumers to break: `npm install @vayo-hq/types`, `npm install
+@vayo-hq/server`, etc. The bare `vayo` CLI package (no scope) is unaffected
+  either way.
+- Updated dependencies [c8cd29c]
+- Updated dependencies [565de2a]
+- Updated dependencies [13800e0]
+- Updated dependencies [15dd8b0]
+- Updated dependencies [a9282c3]
+- Updated dependencies [04879f9]
+- Updated dependencies [4a677a6]
+- Updated dependencies [130aa3e]
+  - @vayo-hq/types@0.1.1-beta.1
+  - @vayo-hq/db-mongo@0.1.1-beta.1
+  - @vayo-hq/openapi-compiler@0.1.1-beta.1
+  - @vayo-hq/ui@0.1.1-beta.1
+  - @vayo-hq/schema-engine@0.1.1-beta.1
+
 ## 0.1.1-beta.0
 
 ### Patch Changes

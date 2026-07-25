@@ -14,14 +14,25 @@
     "@vayo-hq/ui": "0.1.0"
   },
   "changesets": [
+    "auth-versions-settings-polish",
+    "clear-stale-error-on-create-delete-success",
+    "csp-connect-src-and-stale-error-banner",
     "deprecated-tag-and-server-side-lock",
+    "exclude-test-helpers-from-server-package",
     "flows-modal-viewer-controls",
+    "header-toolbar-overflow",
+    "import-missing-contact-license-tos",
     "nested-folder-groups",
     "openapi-annotations-and-settings",
     "openapi-import",
+    "pin-example-requires-editor",
+    "rename-cli-to-vayo-hq-cli",
+    "rename-npm-scope-vayo-hq",
+    "resolve-endpoint-backfill-missing-fields",
     "response-tag-nested-scope-fix",
     "same-port-embedding-visibility",
     "stale-endpoint-detection",
-    "swagger-parity-and-security-hardening"
+    "swagger-parity-and-security-hardening",
+    "update-package-readmes"
   ]
 }
