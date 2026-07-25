@@ -71,9 +71,21 @@ export async function importCommand(options: ImportOptions): Promise<void> {
     // rather than a wrapped/duplicated message.
     const plan = planOpenApiImport(spec, refs, environments);
 
-    if (plan.title || plan.description) {
-      await db.updateSettings({ title: plan.title, description: plan.description }, IMPORT_ACTOR);
-      console.log("vayo: updated project settings (title/description) from the imported spec.");
+    if (plan.title || plan.description || plan.contact || plan.license || plan.termsOfService) {
+      await db.updateSettings(
+        {
+          title: plan.title,
+          description: plan.description,
+          contactName: plan.contact?.name,
+          contactEmail: plan.contact?.email,
+          contactUrl: plan.contact?.url,
+          licenseName: plan.license?.name,
+          licenseUrl: plan.license?.url,
+          termsOfService: plan.termsOfService,
+        },
+        IMPORT_ACTOR,
+      );
+      console.log("vayo: updated project settings (title/description/contact/license/termsOfService) from the imported spec.");
     }
 
     for (const server of plan.servers) {

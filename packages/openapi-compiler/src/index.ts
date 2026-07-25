@@ -690,6 +690,9 @@ export interface ImportMatch {
 export interface ImportPlan {
   title?: string;
   description?: string;
+  contact?: { name?: string; email?: string; url?: string };
+  license?: { name: string; url?: string };
+  termsOfService?: string;
   servers: Array<{ url: string; description?: string }>;
   matched: ImportMatch[];
   /** Spec operations with no corresponding already-discovered endpoint —
@@ -823,6 +826,24 @@ export function planOpenApiImport(
   const info = doc.info as Record<string, unknown> | undefined;
   const title = typeof info?.title === "string" && info.title.trim() ? info.title : undefined;
   const description = typeof info?.description === "string" && info.description.trim() ? info.description : undefined;
+  const termsOfService =
+    typeof info?.termsOfService === "string" && info.termsOfService.trim() ? info.termsOfService : undefined;
+
+  const contactRaw = info?.contact as Record<string, unknown> | undefined;
+  const contact =
+    contactRaw && (typeof contactRaw.name === "string" || typeof contactRaw.email === "string" || typeof contactRaw.url === "string")
+      ? {
+          name: typeof contactRaw.name === "string" ? contactRaw.name : undefined,
+          email: typeof contactRaw.email === "string" ? contactRaw.email : undefined,
+          url: typeof contactRaw.url === "string" ? contactRaw.url : undefined,
+        }
+      : undefined;
+
+  const licenseRaw = info?.license as Record<string, unknown> | undefined;
+  const license =
+    licenseRaw && typeof licenseRaw.name === "string" && licenseRaw.name.trim()
+      ? { name: licenseRaw.name, url: typeof licenseRaw.url === "string" ? licenseRaw.url : undefined }
+      : undefined;
 
   const existingBaseUrls = new Set(existingEnvironments.map((env) => env.variables.baseUrl).filter(Boolean));
   const specServers = Array.isArray(doc.servers) ? (doc.servers as Array<Record<string, unknown>>) : [];
@@ -880,5 +901,5 @@ export function planOpenApiImport(
     }
   }
 
-  return { title, description, servers, matched, unmatched };
+  return { title, description, contact, license, termsOfService, servers, matched, unmatched };
 }

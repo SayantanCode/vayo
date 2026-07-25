@@ -771,6 +771,32 @@ describe("planOpenApiImport", () => {
     expect(plan.description).toBeUndefined();
   });
 
+  it("extracts contact/license/termsOfService from info, the same fields compile() itself emits into an exported spec", () => {
+    const plan = planOpenApiImport(
+      {
+        info: {
+          title: "My Company API",
+          contact: { name: "API Team", email: "api@example.com" },
+          license: { name: "MIT", url: "https://opensource.org/licenses/MIT" },
+          termsOfService: "https://example.com/terms",
+        },
+        paths: {},
+      },
+      [],
+      [],
+    );
+    expect(plan.contact).toEqual({ name: "API Team", email: "api@example.com", url: undefined });
+    expect(plan.license).toEqual({ name: "MIT", url: "https://opensource.org/licenses/MIT" });
+    expect(plan.termsOfService).toBe("https://example.com/terms");
+  });
+
+  it("omits contact/license/termsOfService when absent, and drops a license with no name", () => {
+    const plan = planOpenApiImport({ info: { title: "My Company API", license: { url: "https://example.com" } }, paths: {} }, [], []);
+    expect(plan.contact).toBeUndefined();
+    expect(plan.license).toBeUndefined();
+    expect(plan.termsOfService).toBeUndefined();
+  });
+
   it("extracts servers, skipping one whose baseUrl already exists as an environment", () => {
     const plan = planOpenApiImport(
       {
