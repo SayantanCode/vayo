@@ -9,9 +9,27 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   version:
     runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     permissions:
       contents: write
       pull-requests: write
+      # Lets this job mint the short-lived OIDC token npm's Trusted
+      # Publishing exchanges for a real publish credential — no
+      # NPM_TOKEN/NODE_AUTH_TOKEN secret needed, ever, as long as each
+      # package has a matching Trusted Publisher configured on npmjs.com
+      # (repo: SayantanCode/vayo, workflow: this exact file path).
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -26,19 +44,53 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+          # Required for npm's OIDC trusted-publish exchange to target the
+          # right registry — without this, `npm publish` has nothing to
+          # authenticate the minted OIDC token against.
+          registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Trusted Publishing's OIDC token exchange needs npm >= 11.5.1 — newer
+      # than what Node 20's bundled npm ships — forced explicitly rather
+      # than left to whatever version happens to come with the runner.
+      - name: Ensure npm supports OIDC trusted publishing
+        run: npm install -g npm@latest
+
+      # Publishing stale or missing dist/ output would be worse than not
+      # publishing at all — dist/ is gitignored, so a fresh checkout has
+      # none until built. Full CI battery repeated here (not just build)
+      # as a deliberate second check immediately before a one-way-door
+      # action, independent of whatever already passed on the PR itself.
+      - name: Build
+        run: pnpm build
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check package boundaries
+        run: pnpm check:boundaries
+
+      - name: Test
+        run: pnpm test
+        env:
+          VAYO_TEST_MONGO_URI: mongodb://localhost:27017/vayo_test_dbmongo
+
       # Maintains a "Version Packages" PR whenever unreleased changesets
       # exist on main — bumping versions and writing changelogs from
-      # whatever changesets have accumulated. Deliberately has no `publish`
-      # input: npm publish stays a manual, separate, human-triggered step
-      # (CLAUDE.md) — run `pnpm release` locally once packages are actually
-      # ready to stop being `"private": true`. No NPM_TOKEN needed here.
-      - name: Create/update Version Packages PR
+      # whatever's accumulated. Once that PR is merged, the push event this
+      # workflow reacts to has zero pending changesets left, and
+      # changesets/action runs `publish` instead: `pnpm release`
+      # (`changeset publish`) shells out to `npm publish` per package,
+      # authenticated entirely via the OIDC exchange above — an ordinary
+      # feature-PR merge (which normally adds a changeset) only ever
+      # refreshes the Version PR, never triggers a real publish.
+      - name: Create/update Version Packages PR, or publish once it's merged
         uses: changesets/action@v1
         with:
           version: pnpm version-packages
+          publish: pnpm release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
