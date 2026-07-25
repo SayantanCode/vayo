@@ -1,4 +1,4 @@
-// An in-memory VayoDbAdapter for @vayo/server's own tests. Server route
+// An in-memory VayoDbAdapter for @vayo-hq/server's own tests. Server route
 // handlers are the thing under test here — the Mongo adapter's own
 // correctness (merge logic, rolling caps, reparenting) is already covered by
 // packages/db-mongo/src/index.test.ts, so this fake just needs to satisfy the
@@ -24,8 +24,8 @@ import type {
   TestRunResult,
   TestScriptDoc,
   VayoDbAdapter,
-} from "@vayo/types";
-import { mergeStaticResult, stableHash, type StaticRouteMergeInput } from "@vayo/schema-engine";
+} from "@vayo-hq/types";
+import { mergeStaticResult, stableHash, type StaticRouteMergeInput } from "@vayo-hq/schema-engine";
 import { Readable } from "node:stream";
 
 let nextId = 1;
@@ -94,7 +94,7 @@ export function createFakeDb(): VayoDbAdapter {
       return settings;
     },
 
-    // No @vayo/server route calls this directly (real capture merge/inference
+    // No @vayo-hq/server route calls this directly (real capture merge/inference
     // lives in db-mongo, covered there) — kept minimally functional so tests
     // can seed a "real, captured" endpoint (source !== "manual") to exercise
     // routes that branch on it, e.g. the manual-only delete guard.
@@ -138,7 +138,7 @@ export function createFakeDb(): VayoDbAdapter {
       endpoints.set(vayoId, doc);
       return doc;
     },
-    // No production @vayo/server route calls this directly (only vayo
+    // No production @vayo-hq/server route calls this directly (only vayo
     // scan/vayo does) — but the "declared" group/deprecated lock
     // tests need a way to seed an endpoint whose groupSource/
     // deprecatedSource is actually "declared", so this delegates to the
@@ -491,7 +491,7 @@ export function createFakeDb(): VayoDbAdapter {
     },
     async listExamples(vayoId) {
       // Mirrors the real adapter: the full mixed list (rolling-window
-      // captures + pinned), not pre-filtered — see @vayo/types' own doc
+      // captures + pinned), not pre-filtered — see @vayo-hq/types' own doc
       // comment on VayoDbAdapter.listExamples.
       return [...examples.values()]
         .filter((e) => e.vayoId === vayoId)

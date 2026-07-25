@@ -1,4 +1,4 @@
-// @vayo/ui — the landing screen for an invite link (?invite=<token>). Shown
+// @vayo-hq/ui — the landing screen for an invite link (?invite=<token>). Shown
 // instead of LoginScreen when that query param is present and nobody's
 // logged in yet. Creating the account here does NOT log the new member in —
 // POST /api/team/accept-invite only ever returns the created member, never a
@@ -7,7 +7,7 @@
 // form afterward, same as any other new account.
 
 import { useState, type FormEvent } from "react";
-import type { TeamRole } from "@vayo/types";
+import type { TeamRole } from "@vayo-hq/types";
 import { api, ApiError } from "../api.js";
 import { ROLE_DESCRIPTIONS } from "../role-descriptions.js";
 

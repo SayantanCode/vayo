@@ -1,4 +1,4 @@
-// @vayo/server — vayo_test_scripts (Try It Now's pre/post-request scripts).
+// @vayo-hq/server — vayo_test_scripts (Try It Now's pre/post-request scripts).
 // The scripts themselves only ever execute client-side, sandboxed in a Web
 // Worker (packages/ui/src/script-runner.worker.ts) — this route just
 // persists the script text and the most recent run's pass/fail summary.

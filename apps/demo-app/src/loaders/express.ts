@@ -1,5 +1,5 @@
 // apps/demo-app/src/loaders/express.ts — the base Express app: JSON body
-// parsing plus the dev-only CORS handler that lets @vayo/ui's Try It Now
+// parsing plus the dev-only CORS handler that lets @vayo-hq/ui's Try It Now
 // tab call this API directly from the browser. No routes mounted here —
 // that's loaders/routes.ts's job, kept separate so each loader has exactly
 // one responsibility.

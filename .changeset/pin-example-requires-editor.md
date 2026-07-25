@@ -1,5 +1,5 @@
 ---
-"@vayo/server": patch
+"@vayo-hq/server": patch
 ---
 
 Fixed a real permission gap found during a full viewer-role audit:

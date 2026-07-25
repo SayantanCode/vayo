@@ -1,4 +1,4 @@
-// @vayo/ui — resolves a dot-separated path (e.g. "response.body.token")
+// @vayo-hq/ui — resolves a dot-separated path (e.g. "response.body.token")
 // against a plain object context — what a FlowStep.extractVariables value
 // means (docs/03-data-model.md "Flows").
 

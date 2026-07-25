@@ -1,4 +1,4 @@
-# @vayo/openapi-compiler
+# @vayo-hq/openapi-compiler
 
 Compiles Vayo's resolved endpoints into a valid OpenAPI 3.1 document — the
 backbone of `vayo export` and the docs UI's `/api/spec` endpoint.
@@ -10,7 +10,7 @@ validates as plain OpenAPI 3.1, so it works with any tool that already
 speaks that format.
 
 ```ts
-import { compile, validate } from "@vayo/openapi-compiler";
+import { compile, validate } from "@vayo-hq/openapi-compiler";
 
 const doc = await compile(resolvedEndpoints, "v1"); // throws if the result wouldn't validate
 

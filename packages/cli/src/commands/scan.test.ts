@@ -8,8 +8,8 @@ const flagEndpointsNotInScan = vi.fn();
 const autoOrganizeFolders = vi.fn();
 const loadConfig = vi.fn();
 
-vi.mock("@vayo/ast", () => ({ scanProject: (...args: unknown[]) => scanProject(...args) }));
-vi.mock("@vayo/db-mongo", () => ({
+vi.mock("@vayo-hq/ast", () => ({ scanProject: (...args: unknown[]) => scanProject(...args) }));
+vi.mock("@vayo-hq/db-mongo", () => ({
   createAdapter: () => ({
     listApiVersions,
     upsertStaticResult,

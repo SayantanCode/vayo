@@ -1,10 +1,10 @@
-// @vayo/types — the shared contract every other Vayo package codes against.
+// @vayo-hq/types — the shared contract every other Vayo package codes against.
 // Source of truth: docs/03-data-model.md. If you change a shape here,
 // update that doc in the same commit — they must never drift apart.
 
 /** A JSON Schema document/fragment. Kept as `unknown`-friendly rather than
  * pulling in a full JSON Schema type dependency for v1 — tighten this once
- * @vayo/schema-engine's actual inference output shape is finalized. */
+ * @vayo-hq/schema-engine's actual inference output shape is finalized. */
 export type JSONSchema = Record<string, unknown>;
 
 // ---------------------------------------------------------------------------
@@ -340,14 +340,14 @@ export interface AttachmentDoc {
   uploadedAt: string;
 }
 
-/** The one place this limit is defined — both `@vayo/db-mongo` (rejects an
- * upload over this size before it reaches GridFS) and `@vayo/server`
+/** The one place this limit is defined — both `@vayo-hq/db-mongo` (rejects an
+ * upload over this size before it reaches GridFS) and `@vayo-hq/server`
  * (multer's own `limits.fileSize`, so an oversized request is rejected
  * before the handler even runs) import it from here. Previously duplicated
  * by hand in both packages; centralizing it here removes that drift risk
- * without giving `@vayo/server` a direct dependency on `@vayo/db-mongo` —
- * `@vayo/types` is the one layer every adapter (including a future
- * `@vayo/db-postgres`) and `@vayo/server` already share, so this is the
+ * without giving `@vayo-hq/server` a direct dependency on `@vayo-hq/db-mongo` —
+ * `@vayo-hq/types` is the one layer every adapter (including a future
+ * `@vayo-hq/db-postgres`) and `@vayo-hq/server` already share, so this is the
  * adapter-agnostic home for a constant both sides need to agree on. */
 export const MAX_ATTACHMENT_BYTES = 40 * 1024 * 1024;
 
@@ -575,16 +575,16 @@ export interface OverrideUpdatedEvent {
 
 // ---------------------------------------------------------------------------
 // The DB adapter contract (docs/08-packages-and-repo-structure.md)
-// Lives here, not in @vayo/db-mongo, so that capture-express/server/cli can
+// Lives here, not in @vayo-hq/db-mongo, so that capture-express/server/cli can
 // depend on the *shape* of persistence without depending on the concrete
-// Mongo implementation — this is what makes a future @vayo/db-postgres a
+// Mongo implementation — this is what makes a future @vayo-hq/db-postgres a
 // drop-in rather than a rewrite of every consumer.
 // ---------------------------------------------------------------------------
 export interface VayoDbAdapter {
   upsertEndpoint(sample: CapturedSample): Promise<EndpointDoc>;
-  /** Merges one `@vayo/ast` static-scan route result into the matching
+  /** Merges one `@vayo-hq/ast` static-scan route result into the matching
    * EndpointDoc (docs/04-capture-engine.md Step 2/3). `route` is typed
-   * loosely here (rather than importing `@vayo/ast`'s `StaticRouteResult`)
+   * loosely here (rather than importing `@vayo-hq/ast`'s `StaticRouteResult`)
    * to avoid a dependency from the shared types package onto a downstream
    * consumer — any object with this shape works. */
   upsertStaticResult(
@@ -606,7 +606,7 @@ export interface VayoDbAdapter {
   getEndpoint(vayoId: string): Promise<EndpointDoc | null>;
   listEndpoints(version: string): Promise<EndpointDoc[]>;
   upsertOverride(override: Omit<OverrideDoc, "_id">): Promise<OverrideDoc>;
-  /** Single-override lookup by targetId — used by @vayo/server to compute
+  /** Single-override lookup by targetId — used by @vayo-hq/server to compute
    * an accurate before/after diff for the audit log on write. */
   getOverride(targetId: string): Promise<OverrideDoc | null>;
   listOverrides(vayoId: string): Promise<OverrideDoc[]>;
@@ -649,7 +649,7 @@ export interface VayoDbAdapter {
    * `commentId` starts null (see `AttachmentDoc`). `Uint8Array`, not
    * `Buffer` — this package has zero dependencies by design (not even
    * `@types/node`), and a real `Buffer` (from `req.file.buffer` in
-   * `@vayo/server`) already satisfies `Uint8Array` directly. */
+   * `@vayo-hq/server`) already satisfies `Uint8Array` directly. */
   uploadAttachment(input: {
     vayoId: string;
     filename: string;
@@ -662,7 +662,7 @@ export interface VayoDbAdapter {
   /** Null if the attachment doesn't exist — otherwise its metadata plus a
    * readable stream of the actual bytes for the download route to pipe.
    * Typed as `unknown` rather than `NodeJS.ReadableStream` for the same
-   * zero-dependencies reason as `data` above — `@vayo/server` (which does
+   * zero-dependencies reason as `data` above — `@vayo-hq/server` (which does
    * have real Node types) casts it back at the one call site that pipes
    * it to a response. */
   downloadAttachment(attachmentId: string): Promise<{ attachment: AttachmentDoc; stream: unknown } | null>;

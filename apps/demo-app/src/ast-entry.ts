@@ -1,4 +1,4 @@
-// apps/demo-app/src/ast-entry.ts — the adapter `@vayo/ast`'s scanProject
+// apps/demo-app/src/ast-entry.ts — the adapter `@vayo-hq/ast`'s scanProject
 // points at (VayoConfig.appEntryPath, docs/04-capture-engine.md Step 2 #1).
 // Exports the plain, already-configured app with no Vayo middleware mounted.
 

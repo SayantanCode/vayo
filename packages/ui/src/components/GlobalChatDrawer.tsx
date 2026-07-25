@@ -1,4 +1,4 @@
-// @vayo/ui — the header's cross-endpoint chat: a side drawer (not a page you
+// @vayo-hq/ui — the header's cross-endpoint chat: a side drawer (not a page you
 // navigate to, not a blocking modal) so asking "how do these APIs relate"
 // never means losing your place on whatever tab you're already on. Scoped
 // to messages tagging 2+ endpoints specifically — a focused "questions that
@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { X } from "lucide-react";
-import type { CommentDoc } from "@vayo/types";
+import type { CommentDoc } from "@vayo-hq/types";
 import { api, ApiError } from "../api.js";
 import { applyMentionSelection, detectMentionTrigger, formatEndpointTagToken, type MentionTrigger } from "../mentions.js";
 import { MessageBody } from "./MessageBody.js";

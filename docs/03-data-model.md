@@ -153,7 +153,7 @@ together until the next recognized `@`-tag or the comment's end. No
 Step 2 #4). `group` can be a plain name (`"Orders"`) or a "/"-separated
 nested path (`"Admin/Users"`) — the latter comes from either a nested
 `routes/<a>/<b>/*.ts` file layout or a nested `@group Admin/Users` tag, and
-`autoOrganizeFolders` (`@vayo/db-mongo`) turns each segment into one level
+`autoOrganizeFolders` (`@vayo-hq/db-mongo`) turns each segment into one level
 of real nested sidebar folders. `groupSource` is `"declared"` only when an
 explicit `@group <name>` tag (swagger-jsdoc's own convention, and only
 recognized inside a comment also carrying the `@vayo` sentinel line —
@@ -199,7 +199,7 @@ deprecated (or not) through the UI, but once `deprecatedSource` is
 check, applied at the same three write paths as the folder-placement lock
 above, not just a hidden UI toggle.
 
-**`tags` (OpenAPI standard) vs. `x-vayo-group`** — `@vayo/openapi-compiler`
+**`tags` (OpenAPI standard) vs. `x-vayo-group`** — `@vayo-hq/openapi-compiler`
 also emits `group` as a real, standard OpenAPI `tags: [group]` array on
 each operation (the full "/"-separated path as one tag string, not one
 tag per segment — a flat-tag renderer has no concept of nesting, and two
@@ -382,7 +382,7 @@ never deleted, so a `replyToId` is never left dangling.
 **@mentions** are encoded directly in `body` as `@[Display Name](memberId)`,
 not a separate field — a deliberate choice over freeform "@Jane Smith" text
 matching, since the token carries the exact `memberId` and stays unambiguous
-even with duplicate first names. `@vayo/ui`'s `mentions.ts` parses this
+even with duplicate first names. `@vayo-hq/ui`'s `mentions.ts` parses this
 syntax for both the compose-time autocomplete and rendering a resolved
 mention as a highlighted span. This is explicitly *not* a private-messaging
 feature: a mention still posts to the same shared, endpoint-scoped
@@ -395,7 +395,7 @@ alongside Team Chat.
 template](vayoId)` in `body`, parsed by the same `mentions.ts` (a single
 combined tokenizer, not two independent parsers — a message can freely
 interleave `@mentions` and `#tags` in one linear pass) and independently
-re-extracted server-side (`@vayo/server`'s `extractTaggedVayoIds`,
+re-extracted server-side (`@vayo-hq/server`'s `extractTaggedVayoIds`,
 duplicated rather than shared for the same reason `extractMentionedMemberIds`
 already is: server and UI don't depend on each other). Every `#tag` typed
 becomes one more entry in `vayoIds`, unioned with the endpoint the message
@@ -482,7 +482,7 @@ interface NotificationDoc {
 
 **Indexes:** `{ createdAt: -1 }`. Written alongside the existing write path
 for each event type — `applyOverride`/`addComment` (both the REST route and
-the equivalent socket handler) in `@vayo/server`, and `db-mongo`'s own
+the equivalent socket handler) in `@vayo-hq/server`, and `db-mongo`'s own
 `upsertEndpoint` for `schema_change`. A `schema_change` notification is only
 created when a *previously known* endpoint's schema actually changes — the
 very first sample for a brand-new endpoint is a discovery, not a change, and
@@ -528,7 +528,7 @@ interface SettingsDoc {
 }
 ```
 
-`@vayo/openapi-compiler`'s `compile()` takes an optional third
+`@vayo-hq/openapi-compiler`'s `compile()` takes an optional third
 `CompileOptions` argument (`{title?, description?, servers?,
 pinnedExamplesByVayoId?}`) — both `GET /api/spec` and `vayo export
 --format openapi` fetch `vayo_settings` (for `title`/`description`),
@@ -806,7 +806,7 @@ as environments.
 
 ## Resolving a read: the merge function
 
-`openapi-compiler` and `@vayo/server`'s resolver both call the same pure
+`openapi-compiler` and `@vayo-hq/server`'s resolver both call the same pure
 function — implement it once in `schema-engine`, import everywhere:
 
 ```typescript

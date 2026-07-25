@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { FilePlus, FileX, MailX, MessageSquare, Pencil, Shield, Sparkles, UserMinus, UserPlus } from "lucide-react";
-import type { AuditAction, AuditLogDoc } from "@vayo/types";
+import type { AuditAction, AuditLogDoc } from "@vayo-hq/types";
 import { api } from "../../api.js";
 import { AUDIT_ACTION_LABELS, describeAuditEntry, type FieldChange } from "../../audit-diff.js";
 import { useConfig } from "../../contexts/ConfigContext.js";

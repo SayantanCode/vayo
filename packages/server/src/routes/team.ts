@@ -1,4 +1,4 @@
-// @vayo/server — team membership, invites (single/bulk/list/revoke), role
+// @vayo-hq/server — team membership, invites (single/bulk/list/revoke), role
 // and self-service name changes, and accept-invite. The single largest
 // resource — team administration is the entirety of what the `owner` role
 // is for (docs/05-security.md §4) — but still one cohesive resource, not
@@ -8,7 +8,7 @@ import { Router, type NextFunction, type Request, type RequestHandler, type Resp
 import bcrypt from "bcrypt";
 import multer from "multer";
 import { z } from "zod";
-import { MAX_AVATAR_BYTES, type TeamRole, type VayoDbAdapter } from "@vayo/types";
+import { MAX_AVATAR_BYTES, type TeamRole, type VayoDbAdapter } from "@vayo-hq/types";
 import { hashToken, requireRole, type VayoAuthedRequest } from "../auth-middleware.js";
 import { autoCatchAsyncErrors } from "../error-handling.js";
 import type { RouteDeps } from "../server-deps.js";

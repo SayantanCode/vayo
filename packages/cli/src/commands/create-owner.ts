@@ -9,7 +9,7 @@
 
 import bcrypt from "bcrypt";
 import prompts from "prompts";
-import { createAdapter } from "@vayo/db-mongo";
+import { createAdapter } from "@vayo-hq/db-mongo";
 import { requireMongoUri } from "../config.js";
 
 export interface CreateOwnerOptions {

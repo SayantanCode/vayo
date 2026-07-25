@@ -1,4 +1,4 @@
-// @vayo/ui — Socket.IO client wrapper (docs/06-realtime-collaboration.md).
+// @vayo-hq/ui — Socket.IO client wrapper (docs/06-realtime-collaboration.md).
 // One connection per session; reconnects handled by socket.io-client itself.
 
 import { useEffect, useState } from "react";

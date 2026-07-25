@@ -1,4 +1,4 @@
-// @vayo/ui — a small "are you sure?" dialog for a destructive action
+// @vayo-hq/ui — a small "are you sure?" dialog for a destructive action
 // triggered from somewhere that can't host an inline confirm step itself
 // (a right-click context menu closes on any click, unlike a modal's own
 // stable detail panel — see TeamModal's inline "Remove from team" flow for

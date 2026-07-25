@@ -1,4 +1,4 @@
-// @vayo/ui — structured filters for the endpoint search (Cmd/Ctrl+K
+// @vayo-hq/ui — structured filters for the endpoint search (Cmd/Ctrl+K
 // command palette), on top of the free-text match that already existed.
 // Pulled out as pure functions for the same reason as mentions.ts/
 // chat-filters.ts.

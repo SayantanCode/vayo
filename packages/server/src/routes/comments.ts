@@ -1,7 +1,7 @@
-// @vayo/server — vayo_comments (Team Chat, docs/06-realtime-collaboration.md).
+// @vayo-hq/server — vayo_comments (Team Chat, docs/06-realtime-collaboration.md).
 import { Router } from "express";
 import { z } from "zod";
-import type { AuditAction, CommentDoc, VayoDbAdapter } from "@vayo/types";
+import type { AuditAction, CommentDoc, VayoDbAdapter } from "@vayo-hq/types";
 import { requireRole, type VayoAuthedRequest } from "../auth-middleware.js";
 import { autoCatchAsyncErrors } from "../error-handling.js";
 import type { RouteDeps } from "../server-deps.js";

@@ -1,12 +1,12 @@
-// @vayo/server — pure computation for GET /api/coverage, split out so the
+// @vayo-hq/server — pure computation for GET /api/coverage, split out so the
 // review-queue logic is unit-testable directly against hand-built
 // ResolvedEndpoint fixtures. That matters here specifically because two of
 // its inputs (a "static"-sourced endpoint, a schema_change-worthy history)
-// aren't reachable through any @vayo/server HTTP route at all — only
-// @vayo/ast's scan output and real captured traffic produce them, neither of
+// aren't reachable through any @vayo-hq/server HTTP route at all — only
+// @vayo-hq/ast's scan output and real captured traffic produce them, neither of
 // which this package can fabricate through its own API surface.
 
-import type { ResolvedEndpoint } from "@vayo/types";
+import type { ResolvedEndpoint } from "@vayo-hq/types";
 
 export interface CoverageRef {
   vayoId: string;

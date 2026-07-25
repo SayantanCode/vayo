@@ -45,12 +45,12 @@ very good reason, stated explicitly in the PR description:
    lives only in `x-vayo-*` extension fields.
 3. **Overrides are additive, never destructive.** Re-running capture or the
    AST scanner must never silently erase a manual edit.
-4. **Every role check happens server-side**, in `@vayo/server` itself —
+4. **Every role check happens server-side**, in `@vayo-hq/server` itself —
    `docs/05-security.md` §4. A hidden UI button is not a security control.
 5. **Framework-agnostic boundary.** `schema-engine`, `openapi-compiler`,
    `db-mongo`, and `ui` must never import Express (or any other
    web-framework) types — only `capture-express` (and the CLI's
-   app-bootstrapping adapter) may touch the *user's* framework. `@vayo/server`
+   app-bootstrapping adapter) may touch the *user's* framework. `@vayo-hq/server`
    is exempt: it's Vayo's own REST API server, built on Express as its own
    implementation choice, which is a different thing from the user's captured
    app potentially being on a different stack — see
@@ -68,17 +68,17 @@ you can do this using only the two docs below and this file, the docs are
 doing their job:
 
 1. Read `docs/04-capture-engine.md` (Step 1, the middleware contract) and
-   `docs/08-packages-and-repo-structure.md`'s `@vayo/capture-express` section.
-2. Your package emits exactly `@vayo/types`'s `CapturedSample` shape and
-   nothing else — `@vayo/schema-engine` only ever consumes that generic,
+   `docs/08-packages-and-repo-structure.md`'s `@vayo-hq/capture-express` section.
+2. Your package emits exactly `@vayo-hq/types`'s `CapturedSample` shape and
+   nothing else — `@vayo-hq/schema-engine` only ever consumes that generic,
    stack-agnostic shape, never anything Fastify-specific. Copy
    `packages/capture-express/src/index.ts`'s structure: path normalization →
    redaction → version resolution → `db.upsertEndpoint(sample)` →
    `db.appendExample(...)`.
 3. Never talk to MongoDB directly — only through the `VayoDbAdapter`
-   interface (`@vayo/types`), passed in via your own `CaptureOptions`. This is
+   interface (`@vayo-hq/types`), passed in via your own `CaptureOptions`. This is
    what keeps the middleware unit-testable without a real database and
-   swappable across `@vayo/db-mongo` vs. a future `@vayo/db-postgres`.
+   swappable across `@vayo-hq/db-mongo` vs. a future `@vayo-hq/db-postgres`.
 4. Redaction: reuse `DEFAULT_REDACT_PATTERNS` and the deny-list convention
    from `docs/05-security.md` §2 — don't invent a new redaction scheme per
    stack.
@@ -115,7 +115,7 @@ doing their job:
 - If you touched `schema-engine`, `openapi-compiler`, `db-mongo`, `server`,
   or `ui`, also run `pnpm check:boundaries` (`pnpm lint` already covers the
   same rule, but the standalone script is a useful quick check while iterating).
-- If you changed a shape in `@vayo/types`, update the matching section of
+- If you changed a shape in `@vayo-hq/types`, update the matching section of
   `docs/03-data-model.md` in the same commit — they must never drift apart.
 - Describe *why*, not just *what*, in the PR description — especially for
   anything that touches `docs/05-security.md`'s non-negotiables.

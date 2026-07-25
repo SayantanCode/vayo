@@ -7,8 +7,8 @@
 // VAYO_TEST_MONGO_URI to point at a different instance (e.g. in CI).
 import { MongoClient } from "mongodb";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import type { CapturedSample } from "@vayo/types";
-import type { StaticRouteMergeInput } from "@vayo/schema-engine";
+import type { CapturedSample } from "@vayo-hq/types";
+import type { StaticRouteMergeInput } from "@vayo-hq/schema-engine";
 import { ATTACHMENTS_BUCKET, COLLECTIONS, createAdapter, runMigrations } from "./index.js";
 
 const TEST_MONGO_URI = process.env.VAYO_TEST_MONGO_URI ?? "mongodb://localhost:27017/vayo_test_dbmongo";
@@ -1091,7 +1091,7 @@ describe("createAdapter — settings", () => {
     // fields were added — written directly, not through updateSettings, so
     // it genuinely lacks the keys entirely (not just null), the same
     // "old document missing a new field" scenario resolveEndpoint
-    // (@vayo/schema-engine) already handles for EndpointDoc.
+    // (@vayo-hq/schema-engine) already handles for EndpointDoc.
     await client
       .db()
       .collection(COLLECTIONS.settings)

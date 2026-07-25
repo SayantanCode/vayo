@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { EnvironmentDoc, ExampleDoc } from "@vayo/types";
+import type { EnvironmentDoc, ExampleDoc } from "@vayo-hq/types";
 import { SchemaField } from "../../SchemaField.js";
 import { CopyField } from "../CopyField.js";
 import { CodeSamplePanel } from "../CodeSamplePanel.js";

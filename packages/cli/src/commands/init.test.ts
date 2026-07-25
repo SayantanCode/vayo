@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initCommand } from "./init.js";
 
 const runMigrations = vi.fn().mockResolvedValue(undefined);
-vi.mock("@vayo/db-mongo", () => ({ runMigrations: (...args: unknown[]) => runMigrations(...args) }));
+vi.mock("@vayo-hq/db-mongo", () => ({ runMigrations: (...args: unknown[]) => runMigrations(...args) }));
 
 let tmpDir: string;
 let originalCwd: string;
@@ -126,8 +126,8 @@ describe("initCommand", () => {
       await initCommand({ mongoUri: "mongodb://localhost:27017/vayo", appEntryPath: "./vayo.ast-entry.js" });
 
       const printed = logSpy.mock.calls.map((args) => args.join(" ")).join("\n");
-      expect(printed).toContain('const { capture } = require("@vayo/capture-express");');
-      expect(printed).not.toContain('import { capture } from "@vayo/capture-express";');
+      expect(printed).toContain('const { capture } = require("@vayo-hq/capture-express");');
+      expect(printed).not.toContain('import { capture } from "@vayo-hq/capture-express";');
       logSpy.mockRestore();
     });
 
@@ -138,7 +138,7 @@ describe("initCommand", () => {
       await initCommand({ mongoUri: "mongodb://localhost:27017/vayo", appEntryPath: "./vayo.ast-entry.js" });
 
       const printed = logSpy.mock.calls.map((args) => args.join(" ")).join("\n");
-      expect(printed).toContain('import { capture } from "@vayo/capture-express";');
+      expect(printed).toContain('import { capture } from "@vayo-hq/capture-express";');
       logSpy.mockRestore();
     });
   });

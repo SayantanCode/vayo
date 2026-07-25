@@ -1,4 +1,4 @@
-// @vayo/ui — Light/Dark/System theme toggle. "System" leaves `data-theme`
+// @vayo-hq/ui — Light/Dark/System theme toggle. "System" leaves `data-theme`
 // unset so the `prefers-color-scheme` media query in theme.css governs;
 // Light/Dark stamp `data-theme` on <html>, which the same file's
 // `:root[data-theme="..."]` overrides win against in both directions.

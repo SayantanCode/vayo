@@ -20,7 +20,7 @@ import {
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete", "all"]);
 
 /** Finds the first `router.<method>(...)` call in a snippet — a minimal
- * stand-in for @vayo/ast's own (unexported) findRouteRegistrations, just
+ * stand-in for @vayo-hq/ast's own (unexported) findRouteRegistrations, just
  * enough to hand a real CallExpression to extractMiddlewareNames. */
 function firstRouteRegistration(source: string): CallExpression {
   const project = new Project({ useInMemoryFileSystem: true });

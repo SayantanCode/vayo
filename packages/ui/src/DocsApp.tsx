@@ -1,12 +1,12 @@
-// @vayo/ui — DocsApp: the top-level shell. Five tabs per endpoint — Details,
+// @vayo-hq/ui — DocsApp: the top-level shell. Five tabs per endpoint — Details,
 // Flowmap, History, Team Chat, Try It Now — per
-// docs/08-packages-and-repo-structure.md. Talks only to @vayo/server's REST
+// docs/08-packages-and-repo-structure.md. Talks only to @vayo-hq/server's REST
 // API and Socket.IO gateway — never touches MongoDB or any package below
-// @vayo/server directly.
+// @vayo-hq/server directly.
 
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import "./theme.css";
-import type { ApiVersionDoc, ApiVersionStatus, EnvironmentDoc, FlowDoc, FolderDoc, NotificationType, SettingsDoc } from "@vayo/types";
+import type { ApiVersionDoc, ApiVersionStatus, EnvironmentDoc, FlowDoc, FolderDoc, NotificationType, SettingsDoc } from "@vayo-hq/types";
 import { api, ApiError, type ApiConfig } from "./api.js";
 import { useVayoSocket } from "./hooks/useVayoSocket.js";
 import { ConfigProvider } from "./contexts/ConfigContext.js";
@@ -72,7 +72,7 @@ function derivePathname(url: string): string {
 }
 
 export interface DocsAppProps {
-  apiBaseUrl: string; // where @vayo/server's REST API lives
+  apiBaseUrl: string; // where @vayo-hq/server's REST API lives
   socketUrl: string;
   version?: string; // default "v1"
   renderTryItPanel?: ComponentType<{ vayoId: string }>;
@@ -174,7 +174,7 @@ export function DocsApp({
   const [overrideToast, setOverrideToast] = useState<{ vayoId: string; memberId: string } | null>(null);
 
   const config: ApiConfig = useMemo(() => ({ baseUrl: apiBaseUrl, token }), [apiBaseUrl, token]);
-  // @vayo/server's Socket.IO path defaults to `${mountPath}/socket.io`, not
+  // @vayo-hq/server's Socket.IO path defaults to `${mountPath}/socket.io`, not
   // Engine.IO's bare `/socket.io` (docs/06-realtime-collaboration.md) — and
   // apiBaseUrl already IS `${origin}${mountPath}` (main.tsx), so its own
   // pathname is exactly that mountPath. Deriving from it here means no

@@ -1,4 +1,4 @@
-// @vayo/ui — renders a Team Chat message body, turning `@[Name](memberId)`
+// @vayo-hq/ui — renders a Team Chat message body, turning `@[Name](memberId)`
 // and `#[path](vayoId)` tokens into a highlighted mention or a clickable
 // endpoint-tag respectively, instead of the raw stored syntax. Shared by
 // the per-endpoint Team Chat tab and the cross-endpoint chat drawer so a

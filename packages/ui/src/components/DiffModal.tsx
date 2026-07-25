@@ -1,10 +1,10 @@
-// @vayo/ui — compares two API versions (docs/07-api-versioning.md), via
-// `@vayo/server`'s /api/diff (a custom TypeScript diff over Vayo's own
+// @vayo-hq/ui — compares two API versions (docs/07-api-versioning.md), via
+// `@vayo-hq/server`'s /api/diff (a custom TypeScript diff over Vayo's own
 // compiled OpenAPI documents — not oasdiff, see that doc's notes on why).
 
 import { useState } from "react";
-import type { ApiVersionDoc } from "@vayo/types";
-import type { SpecDiff } from "@vayo/openapi-compiler";
+import type { ApiVersionDoc } from "@vayo-hq/types";
+import type { SpecDiff } from "@vayo-hq/openapi-compiler";
 import { api, ApiError } from "../api.js";
 import { Modal } from "./Modal.js";
 import { useConfig } from "../contexts/ConfigContext.js";

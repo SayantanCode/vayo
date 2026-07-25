@@ -1,5 +1,5 @@
 ---
-"@vayo/openapi-compiler": patch
+"@vayo-hq/openapi-compiler": patch
 "vayo": patch
 ---
 

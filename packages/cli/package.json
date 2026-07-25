@@ -22,12 +22,12 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@vayo/types": "workspace:*",
-    "@vayo/ast": "workspace:*",
-    "@vayo/db-mongo": "workspace:*",
-    "@vayo/schema-engine": "workspace:*",
-    "@vayo/openapi-compiler": "workspace:*",
-    "@vayo/server": "workspace:*",
+    "@vayo-hq/types": "workspace:*",
+    "@vayo-hq/ast": "workspace:*",
+    "@vayo-hq/db-mongo": "workspace:*",
+    "@vayo-hq/schema-engine": "workspace:*",
+    "@vayo-hq/openapi-compiler": "workspace:*",
+    "@vayo-hq/server": "workspace:*",
     "commander": "^12.1.0",
     "prompts": "^2.4.2",
     "dotenv": "^16.4.5",

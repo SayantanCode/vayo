@@ -1,4 +1,4 @@
-// @vayo/ui — CodeMirror extension that finds `{{variable}}` tokens in a
+// @vayo-hq/ui — CodeMirror extension that finds `{{variable}}` tokens in a
 // document and colors them inline (green/red) based on whether they
 // resolve against the active environment, Postman-style. Valid tokens get
 // a native `title` tooltip with the resolved value; invalid tokens report

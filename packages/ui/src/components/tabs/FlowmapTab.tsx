@@ -1,4 +1,4 @@
-// @vayo/ui — Flowmap: this endpoint's middleware chain (unchanged from v1 —
+// @vayo-hq/ui — Flowmap: this endpoint's middleware chain (unchanged from v1 —
 // docs/04-capture-engine.md §4) PLUS which saved Flows (FlowsModal.tsx) it
 // participates in. Cross-endpoint journeys were deliberately deferred past
 // v1 as a from-scratch feature — but Flows already model exactly that
@@ -6,7 +6,7 @@
 // that data instead of inventing a second, inference-based notion of "these
 // endpoints are related."
 
-import type { FlowDoc } from "@vayo/types";
+import type { FlowDoc } from "@vayo-hq/types";
 import type { EndpointSummary } from "../../types.js";
 
 interface FlowmapTabProps {

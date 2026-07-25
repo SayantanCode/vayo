@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CapturedSample, EndpointDoc, OverrideDoc } from "@vayo/types";
+import type { CapturedSample, EndpointDoc, OverrideDoc } from "@vayo-hq/types";
 import {
   detectSchemaChange,
   mergeCapturedSample,

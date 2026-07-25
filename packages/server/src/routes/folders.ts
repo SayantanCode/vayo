@@ -1,4 +1,4 @@
-// @vayo/server — vayo_folders: sidebar organization.
+// @vayo-hq/server — vayo_folders: sidebar organization.
 import { Router } from "express";
 import { z } from "zod";
 import { requireRole, type VayoAuthedRequest } from "../auth-middleware.js";

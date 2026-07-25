@@ -1,4 +1,4 @@
-// @vayo/ui — Flows: ordered, related-endpoint sequences (Postman's
+// @vayo-hq/ui — Flows: ordered, related-endpoint sequences (Postman's
 // Collection Runner equivalent). Since `FlowStep` only stores `vayoId` +
 // `extractVariables` (no per-step body/auth override in the data model),
 // each step's request body is built the same way CodeSamplePanel builds
@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
-import type { EnvironmentDoc, ExampleDoc, FlowDoc, FlowStep } from "@vayo/types";
+import type { EnvironmentDoc, ExampleDoc, FlowDoc, FlowStep } from "@vayo-hq/types";
 import { api } from "../api.js";
 import { interpolate, requestBodySchema, type EndpointSummary } from "../types.js";
 import { exampleFromSchema } from "../example-from-schema.js";

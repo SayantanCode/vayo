@@ -1,10 +1,10 @@
-// @vayo/ui — create/edit/delete environments + their key-value variables.
+// @vayo-hq/ui — create/edit/delete environments + their key-value variables.
 // Follows the existing .modal/.modal__list conventions from
 // CreateFolderModal/MoveToFolderModal.
 
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import type { EnvironmentDoc } from "@vayo/types";
+import type { EnvironmentDoc } from "@vayo-hq/types";
 import { Modal } from "./Modal.js";
 
 interface EnvironmentsModalProps {

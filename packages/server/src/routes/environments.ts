@@ -1,4 +1,4 @@
-// @vayo/server — vayo_environments (Try It Now's environment/variable switcher).
+// @vayo-hq/server — vayo_environments (Try It Now's environment/variable switcher).
 import { Router } from "express";
 import { z } from "zod";
 import { requireRole, type VayoAuthedRequest } from "../auth-middleware.js";

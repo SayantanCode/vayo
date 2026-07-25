@@ -2,7 +2,7 @@
 // Cheap CI/pre-PR guard for the framework-agnostic boundary
 // (docs/08-packages-and-repo-structure.md's closing section): fails if
 // schema-engine, openapi-compiler, db-mongo, or ui import "express" or
-// "@vayo/capture-express". @vayo/server is deliberately exempt — it's
+// "@vayo-hq/capture-express". @vayo-hq/server is deliberately exempt — it's
 // Vayo's own REST API server, built on Express as its own implementation
 // choice, not a place where the *user's* app framework could leak in.
 //
@@ -13,7 +13,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const GUARDED_PACKAGES = ["schema-engine", "openapi-compiler", "db-mongo", "ui"];
-const FORBIDDEN_IMPORT_PATTERN = /from\s+["'](express|@vayo\/capture-express)["']/;
+const FORBIDDEN_IMPORT_PATTERN = /from\s+["'](express|@vayo-hq\/capture-express)["']/;
 
 function walk(dir) {
   const out = [];
@@ -40,7 +40,7 @@ for (const pkg of GUARDED_PACKAGES) {
 if (violations.length > 0) {
   console.error("Framework-agnostic boundary violated (docs/08-packages-and-repo-structure.md):\n");
   for (const v of violations) console.error(`  ${v}`);
-  console.error(`\n${GUARDED_PACKAGES.join(", ")} must never import express or @vayo/capture-express.`);
+  console.error(`\n${GUARDED_PACKAGES.join(", ")} must never import express or @vayo-hq/capture-express.`);
   process.exit(1);
 }
 

@@ -1,4 +1,4 @@
-// @vayo/schema-engine
+// @vayo-hq/schema-engine
 // Framework-agnostic. Never import express, never talk to MongoDB directly.
 // See docs/04-capture-engine.md and docs/03-data-model.md "Resolving a read".
 
@@ -9,14 +9,14 @@ import type {
   JSONSchema,
   OverrideDoc,
   ResolvedEndpoint,
-} from "@vayo/types";
+} from "@vayo-hq/types";
 import { mergeSchemas, createSchema, type Schema } from "genson-js";
 
 import { createHash } from "node:crypto";
 
 /** Cap on stored examples per (vayoId, statusCode) — docs/03-data-model.md
  * `vayo_examples`: "5 most recent" isn't expressible as a DB TTL, so
- * `@vayo/db-mongo` enforces this value (defined here, once) by deleting the
+ * `@vayo-hq/db-mongo` enforces this value (defined here, once) by deleting the
  * oldest rows past the cap whenever it appends a new example. */
 export const MAX_EXAMPLES_PER_STATUS = 5;
 
@@ -282,9 +282,9 @@ export function mergeCapturedSample(
   };
 }
 
-/** Structural shape of `@vayo/ast`'s `StaticRouteResult` — declared locally
+/** Structural shape of `@vayo-hq/ast`'s `StaticRouteResult` — declared locally
  * rather than imported so schema-engine (a foundation package other
- * packages sit on top of) doesn't depend on `@vayo/ast` (a consumer). Any
+ * packages sit on top of) doesn't depend on `@vayo-hq/ast` (a consumer). Any
  * object with this shape works, including the real `StaticRouteResult`. */
 export interface StaticRouteMergeInput {
   method: string;
@@ -293,7 +293,7 @@ export interface StaticRouteMergeInput {
   authRequiredGuess: boolean;
   scopes: string[];
   group: string;
-  /** "declared" when `@vayo/ast` found an explicit `@group` tag,
+  /** "declared" when `@vayo-hq/ast` found an explicit `@group` tag,
    * "inferred" otherwise (docs/04-capture-engine.md Step 2 #4) — optional
    * so any caller still constructing the older shape keeps compiling;
    * defaults to "inferred" when omitted. */
@@ -304,12 +304,12 @@ export interface StaticRouteMergeInput {
    * constructing the older shape (without this field) keeps compiling;
    * treated identically to `null` when absent. */
   description?: string | null;
-  /** True when `@vayo/ast` found an explicit bare `@deprecated` tag
+  /** True when `@vayo-hq/ast` found an explicit bare `@deprecated` tag
    * (docs/04-capture-engine.md Step 2 #4a) — optional so any caller still
    * constructing the older shape keeps compiling; defaults to `false`
    * when omitted. */
   deprecated?: boolean;
-  /** A Zod- or Mongoose-derived request body shape, when `@vayo/ast` could
+  /** A Zod- or Mongoose-derived request body shape, when `@vayo-hq/ast` could
    * trace one statically (docs/04-capture-engine.md Step 2 #3/#3b) —
    * optional so any caller still constructing the older shape (without
    * this field) keeps compiling; treated identically to `undefined` when
@@ -333,7 +333,7 @@ export interface StaticRouteMergeInput {
 }
 
 /**
- * Merge one static-scan result (`@vayo/ast`'s `scanProject`) into an
+ * Merge one static-scan result (`@vayo-hq/ast`'s `scanProject`) into an
  * existing (or absent) EndpointDoc. Pure — no I/O. Mirrors
  * `mergeCapturedSample`'s shape but for the other half of the merge
  * precedence in docs/04-capture-engine.md Step 3: static analysis *refines*
@@ -441,7 +441,7 @@ export function mergeStaticResult(
 
 /**
  * Did merging this sample actually change the inferred schema? Used by
- * `@vayo/db-mongo` to decide whether to append a `schema_change` entry to
+ * `@vayo-hq/db-mongo` to decide whether to append a `schema_change` entry to
  * `vayo_audit_log` (docs/03-data-model.md) — kept here, not in db-mongo, so
  * the "what counts as a schema change" definition has one home. Pure: takes
  * the before/after docs, does no I/O itself.

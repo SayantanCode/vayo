@@ -1,4 +1,4 @@
-// @vayo/ui — per-endpoint Markdown/Mermaid notes: documents how an
+// @vayo-hq/ui — per-endpoint Markdown/Mermaid notes: documents how an
 // endpoint fits into a larger frontend workflow (e.g. cascading-dropdown
 // dependencies between endpoints), authored in Markdown with embedded
 // Mermaid diagram support. Stored via the same override mechanism as

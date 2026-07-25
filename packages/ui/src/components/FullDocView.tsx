@@ -1,4 +1,4 @@
-// @vayo/ui — the whole active API version as one continuously scrollable
+// @vayo-hq/ui — the whole active API version as one continuously scrollable
 // page (docs/08-packages-and-repo-structure.md), the same "read the whole
 // reference top to bottom" pattern Postman's own collection documentation
 // view, Redoc, and Swagger UI all converge on. An alternative to — not a
@@ -10,7 +10,7 @@
 // (DocsApp.tsx makes clicking an endpoint here scroll to it instead of
 // switching the selected endpoint, while this mode is active).
 import { useEffect, useMemo, useRef } from "react";
-import type { EnvironmentDoc, FolderDoc, SettingsDoc } from "@vayo/types";
+import type { EnvironmentDoc, FolderDoc, SettingsDoc } from "@vayo-hq/types";
 import { flattenTree, type TreeNode } from "../types.js";
 import { EndpointHeader } from "./EndpointHeader.js";
 import { DetailsTab } from "./tabs/DetailsTab.js";

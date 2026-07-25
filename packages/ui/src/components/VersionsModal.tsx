@@ -1,11 +1,11 @@
-// @vayo/ui — create versions + manage their lifecycle
+// @vayo-hq/ui — create versions + manage their lifecycle
 // (docs/07-api-versioning.md: active -> deprecated -> sunset, with
 // deprecated -> active un-deprecation allowed; sunset is terminal — no
 // delete, versions are never removed, same non-destructive philosophy as
 // everything else).
 
 import { useState } from "react";
-import type { ApiVersionDoc, ApiVersionStatus } from "@vayo/types";
+import type { ApiVersionDoc, ApiVersionStatus } from "@vayo-hq/types";
 import { Modal } from "./Modal.js";
 
 interface VersionsModalProps {

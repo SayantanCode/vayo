@@ -1,4 +1,4 @@
-// @vayo/ui — tracks which team members are online right now, and the most
+// @vayo-hq/ui — tracks which team members are online right now, and the most
 // recent `lastSeenAt` reported for anyone who's gone offline since this
 // hook mounted. Global presence (docs/06-realtime-collaboration.md), not
 // the per-endpoint `presence:join`/`presence:leave` FolderTree/DetailsTab

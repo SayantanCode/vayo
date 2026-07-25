@@ -1,4 +1,4 @@
-// @vayo/server — vayo_flows: saved related-endpoint sequences (Postman
+// @vayo-hq/server — vayo_flows: saved related-endpoint sequences (Postman
 // Collection Runner equivalent for Try It Now).
 import { Router } from "express";
 import { z } from "zod";

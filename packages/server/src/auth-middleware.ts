@@ -1,10 +1,10 @@
-// @vayo/server — identity resolution + role gating, shared by every REST
+// @vayo-hq/server — identity resolution + role gating, shared by every REST
 // route and the Socket.IO handshake (docs/05-security.md §4-5). This is the
 // one place a request's identity is ever derived — every route handler and
 // every socket event handler just reads the result (`req.vayoAuth` /
 // `socket.data`), never re-implements auth itself.
 import type { NextFunction, Request, Response } from "express";
-import type { TeamRole, VayoDbAdapter } from "@vayo/types";
+import type { TeamRole, VayoDbAdapter } from "@vayo-hq/types";
 import { createHmac } from "node:crypto";
 
 export interface AuthResult {

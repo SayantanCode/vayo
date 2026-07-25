@@ -12,7 +12,7 @@ permanently browsable rather than v2 silently replacing v1's history.
 
 `vayo_api_versions.basePathPattern` (e.g. `/api/v{n}`) is matched against the
 normalized path template at capture time (`04-capture-engine.md` step 1),
-via `@vayo/schema-engine`'s `resolveVersion(pathTemplate, configuredVersions)`.
+via `@vayo-hq/schema-engine`'s `resolveVersion(pathTemplate, configuredVersions)`.
 If no pattern matches, samples fall into an implicit `"unversioned"` bucket —
 surfaced in the UI so it's obvious rather than silently dropped.
 
@@ -60,7 +60,7 @@ This doc originally called for shelling out to `oasdiff`. In practice `oasdiff`
 is Go-only — distributed as platform binaries, a Docker image, or a Homebrew
 formula, with no npm package and no WASM build. Pulling a Go binary into a
 Node/TypeScript monorepo (process-spawn, PATH detection, platform-specific
-install) is a worse fit than a small purpose-built diff, so `@vayo/openapi-
+install) is a worse fit than a small purpose-built diff, so `@vayo-hq/openapi-
 compiler` implements its own `diffSpecs(specA, specB, options)` instead. It's
 deliberately scoped to exactly the "what counts as changed" rules below —
 this is a "will this break an integration" check, not a general-purpose
@@ -68,7 +68,7 @@ semantic OpenAPI-diff engine. Flow:
 
 1. `openapi-compiler` produces a valid OpenAPI 3.1 document per version
    (`02-architecture.md`, Flow A).
-2. When a user opens the "Compare versions" view, `@vayo/server`'s
+2. When a user opens the "Compare versions" view, `@vayo-hq/server`'s
    `GET /api/diff?from=&to=` compiles both versions (reusing the same
    `compile()` + `resolveEndpoint` pipeline as `/api/spec`) and calls
    `diffSpecs`, passing each version's `basePathPattern` as a prefix to strip

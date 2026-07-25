@@ -1,4 +1,4 @@
-// @vayo/server — manual endpoint creation + folder/order placement.
+// @vayo-hq/server — manual endpoint creation + folder/order placement.
 import { Router } from "express";
 import { z } from "zod";
 import { requireRole, type VayoAuthedRequest } from "../auth-middleware.js";

@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import type { VayoDbAdapter } from "@vayo/types";
+import type { VayoDbAdapter } from "@vayo-hq/types";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildPathTemplate,

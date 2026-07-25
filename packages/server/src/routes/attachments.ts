@@ -1,9 +1,9 @@
-// @vayo/server — vayo_attachments (Team Chat files/screen recordings),
+// @vayo-hq/server — vayo_attachments (Team Chat files/screen recordings),
 // GridFS-backed in the user's own already-configured MongoDB (BYODB) —
 // docs/03-data-model.md.
 import { Router, type NextFunction, type Request, type Response } from "express";
 import multer from "multer";
-import { MAX_ATTACHMENT_BYTES } from "@vayo/types";
+import { MAX_ATTACHMENT_BYTES } from "@vayo-hq/types";
 import { requireRole, type VayoAuthedRequest } from "../auth-middleware.js";
 import { autoCatchAsyncErrors } from "../error-handling.js";
 import type { RouteDeps } from "../server-deps.js";
@@ -80,8 +80,8 @@ export function createAttachmentsRouter({ db }: RouteDeps): Router {
       `inline; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(result.attachment.filename)}`,
     );
     res.setHeader("Content-Type", result.attachment.mimeType);
-    // @vayo/types keeps this opaque (`unknown`) to stay dependency-free —
-    // @vayo/server is where a real Node stream is actually expected.
+    // @vayo-hq/types keeps this opaque (`unknown`) to stay dependency-free —
+    // @vayo-hq/server is where a real Node stream is actually expected.
     const stream = result.stream as NodeJS.ReadableStream;
     stream.on("error", () => {
       if (!res.headersSent) res.status(500).json({ error: "failed to read attachment" });

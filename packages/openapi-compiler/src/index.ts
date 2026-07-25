@@ -1,8 +1,8 @@
-// @vayo/openapi-compiler
+// @vayo-hq/openapi-compiler
 // Framework-agnostic. Produces valid OpenAPI 3.1 + x-vayo-* extensions.
 // See docs/02-architecture.md and docs/07-api-versioning.md.
 
-import type { AuthType, ExampleDoc, JSONSchema, ResolvedEndpoint } from "@vayo/types";
+import type { AuthType, ExampleDoc, JSONSchema, ResolvedEndpoint } from "@vayo-hq/types";
 import SwaggerParser from "@apidevtools/swagger-parser";
 
 /** x-vayo-* extension keys — the ONLY place Vayo-specific data may live in
@@ -478,7 +478,7 @@ export async function compile(
   const result = await validate(doc);
   if (!result.valid) {
     throw new Error(
-      `@vayo/openapi-compiler: compiled document failed OpenAPI 3.1 validation:\n${result.errors.join("\n")}`,
+      `@vayo-hq/openapi-compiler: compiled document failed OpenAPI 3.1 validation:\n${result.errors.join("\n")}`,
     );
   }
   return doc;
@@ -759,7 +759,7 @@ function collectDescriptionOverrides(
 }
 
 /** A media type's example(s) — the plural, named `examples` map (OpenAPI
- * 3.1's preferred form, and what `@vayo/openapi-compiler` itself emits) when
+ * 3.1's preferred form, and what `@vayo-hq/openapi-compiler` itself emits) when
  * present, else the older singular `example` field most hand-written specs
  * (swagger-jsdoc among them) actually use in practice. Each becomes a
  * pinned `vayo_examples` entry, not another `@example`-style declared one —
@@ -781,7 +781,7 @@ function collectImportedExamples(mediaType: Record<string, unknown> | undefined,
 }
 
 /** A Postman Collection export (`info: {name, schema}`, a top-level `item`
- * array of requests/folders — see `@vayo/server`'s own `PostmanCollection`
+ * array of requests/folders — see `@vayo-hq/server`'s own `PostmanCollection`
  * interface, `postman-export.ts`) has no `paths` object at all, so feeding
  * one into `planOpenApiImport` would otherwise silently produce an empty,
  * misleadingly-successful-looking plan (0 matched, 0 unmatched, no error)
@@ -820,7 +820,7 @@ export function planOpenApiImport(
   const doc = (spec ?? {}) as Record<string, unknown>;
   if (detectPostmanCollection(doc)) {
     throw new Error(
-      '@vayo/openapi-compiler: this file looks like a Postman Collection export ("item"/a postman.com schema URL, no "paths") — vayo import only reads OpenAPI specs right now.',
+      '@vayo-hq/openapi-compiler: this file looks like a Postman Collection export ("item"/a postman.com schema URL, no "paths") — vayo import only reads OpenAPI specs right now.',
     );
   }
   const info = doc.info as Record<string, unknown> | undefined;

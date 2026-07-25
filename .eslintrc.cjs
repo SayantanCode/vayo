@@ -46,7 +46,7 @@ module.exports = {
       // four packages must never import Express (or Vayo's own Express
       // capture adapter) — only capture-express and the CLI's
       // app-bootstrapping adapter may touch the user's web framework.
-      // @vayo/server is deliberately exempt (its own doc comment in
+      // @vayo-hq/server is deliberately exempt (its own doc comment in
       // scripts/check-boundaries.mjs explains why).
       files: [
         "packages/schema-engine/src/**/*.ts",
@@ -60,7 +60,7 @@ module.exports = {
           {
             paths: [
               { name: "express", message: "framework-agnostic boundary: this package must never import Express (docs/08-packages-and-repo-structure.md)." },
-              { name: "@vayo/capture-express", message: "framework-agnostic boundary: this package must never import @vayo/capture-express (docs/08-packages-and-repo-structure.md)." },
+              { name: "@vayo-hq/capture-express", message: "framework-agnostic boundary: this package must never import @vayo-hq/capture-express (docs/08-packages-and-repo-structure.md)." },
             ],
           },
         ],

@@ -44,7 +44,7 @@ is a **documentation aid, not a security control**. It tells a docs reader "this
 looked protected when we last checked" — it must never be used as the actual
 authorization mechanism for anything Vayo itself does. Concretely:
 
-- Vayo's own API (`@vayo/server`) has its own independent auth/session
+- Vayo's own API (`@vayo-hq/server`) has its own independent auth/session
   layer (§4, §5) that does not depend on or trust the `authRequired` field.
 - If detection is wrong (marks a protected endpoint as public, or vice versa),
   the blast radius is "the documentation is momentarily misleading," never "an
@@ -77,11 +77,11 @@ otherwise-permissive setup.
 ## 4. Role enforcement — server-side, always
 
 `viewer` / `editor` / `owner` (from `03-data-model.md`) are enforced in
-`@vayo/server`'s route handlers themselves, not inferred from what the UI
+`@vayo-hq/server`'s route handlers themselves, not inferred from what the UI
 shows:
 
 ```typescript
-// every mutating route in @vayo/server, not just some of them
+// every mutating route in @vayo-hq/server, not just some of them
 router.post("/api/overrides", requireRole("editor"), handler);
 router.post("/api/team/invite", requireRole("owner"), handler);
 router.patch("/api/team/:memberId/role", requireRole("owner"), handler);
@@ -233,7 +233,7 @@ when the field path comes from outside this codebase's own control.
 ## 5. Docs-viewer authentication
 
 Two supported modes, both documented in `08-packages-and-repo-structure.md` for
-`@vayo/server`:
+`@vayo-hq/server`:
 
 1. **Delegated auth** — Vayo validates the user's *existing* session
    cookie/JWT against a function the developer supplies
@@ -307,9 +307,9 @@ client UI would never normally let them try.
   (`VAYO_MONGO_URI`) or a secrets manager the user already has — never
   written to a committed config file, and never logged, including in error
   messages (redact the credentials portion of the URI in any log output).
-- All `@vayo/server` inputs are validated with `zod` at the route boundary
+- All `@vayo-hq/server` inputs are validated with `zod` at the route boundary
   before touching any DB call — no raw `req.body` reaches a Mongo query.
-- CORS on `@vayo/server`'s API defaults to same-origin-only unless the user
+- CORS on `@vayo-hq/server`'s API defaults to same-origin-only unless the user
   explicitly configures allowed origins.
 - Basic rate limiting on the invite-generation and login endpoints specifically
   (these are the two most abuse-prone routes) — a token-bucket limiter per IP is

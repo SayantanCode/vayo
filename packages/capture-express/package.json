@@ -1,8 +1,8 @@
 {
-  "name": "@vayo/capture-express",
+  "name": "@vayo-hq/capture-express",
   "version": "0.1.1-beta.0",
   "license": "MIT",
-  "description": "Express middleware: captures real traffic, redacts sensitive fields, hands samples to @vayo/schema-engine. The only Vayo package allowed to import Express types.",
+  "description": "Express middleware: captures real traffic, redacts sensitive fields, hands samples to @vayo-hq/schema-engine. The only Vayo package allowed to import Express types.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SayantanCode/vayo.git",
@@ -20,8 +20,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@vayo/types": "workspace:*",
-    "@vayo/schema-engine": "workspace:*"
+    "@vayo-hq/types": "workspace:*",
+    "@vayo-hq/schema-engine": "workspace:*"
   },
   "peerDependencies": {
     "express": "^4.19.0"

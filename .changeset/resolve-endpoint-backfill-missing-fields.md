@@ -1,5 +1,5 @@
 ---
-"@vayo/schema-engine": patch
+"@vayo-hq/schema-engine": patch
 ---
 
 Fixed a crash in `resolveEndpoint` for any `EndpointDoc` written before
@@ -12,5 +12,5 @@ missing these entirely — not merely `null` — and `openapi-compiler`'s
 calling `Object.keys` on the missing `declaredExamples`, breaking `/api/spec`
 outright for that version. `resolveEndpoint` now backfills sane defaults
 (`[]`, `{}`, `null`) for these three fields, since it's the one gateway every
-consumer — `compile()`, every `@vayo/server` route, the CLI's
+consumer — `compile()`, every `@vayo-hq/server` route, the CLI's
 export/diff/import commands — reads an endpoint through.

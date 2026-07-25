@@ -1,5 +1,5 @@
 {
-  "name": "@vayo/types",
+  "name": "@vayo-hq/types",
   "version": "0.1.1-beta.0",
   "license": "MIT",
   "description": "Shared TypeScript interfaces for Vayo. No runtime code, no dependencies on any other Vayo package.",

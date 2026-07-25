@@ -1,10 +1,10 @@
-// @vayo/server — Postman collection/environment export. The actual compile
+// @vayo-hq/server — Postman collection/environment export. The actual compile
 // logic is framework-agnostic (../postman-export.ts, usable directly by
 // vayo's `vayo export --format postman` with no running server) — this
 // is just the thin HTTP wrapper around it.
 import { Router } from "express";
-import type { ExampleDoc, ResolvedEndpoint, TestScriptDoc } from "@vayo/types";
-import { resolveEndpoint } from "@vayo/schema-engine";
+import type { ExampleDoc, ResolvedEndpoint, TestScriptDoc } from "@vayo-hq/types";
+import { resolveEndpoint } from "@vayo-hq/schema-engine";
 import { requireRole } from "../auth-middleware.js";
 import { autoCatchAsyncErrors } from "../error-handling.js";
 import { compilePostmanCollection, compilePostmanEnvironment } from "../postman-export.js";

@@ -1,4 +1,4 @@
-// @vayo/ui — "Try It Now": a proper request/response REST client panel
+// @vayo-hq/ui — "Try It Now": a proper request/response REST client panel
 // (Postman-parity redesign). Talks to two different backends: the
 // *target* API being documented (`apiOrigin`, plain `fetch`, no auth of
 // ours involved) and Vayo's own server (`config`, via `api.ts`) for
@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronUp, Copy, Search, Trash2, X } from "lucide-react";
-import type { EnvironmentDoc, ExampleDoc } from "@vayo/types";
+import type { EnvironmentDoc, ExampleDoc } from "@vayo-hq/types";
 import { api } from "../../api.js";
 import { interpolate, requestBodySchema, type EndpointSummary } from "../../types.js";
 import { runScriptInWorker, type ScriptTestResult } from "../../script-runner-client.js";

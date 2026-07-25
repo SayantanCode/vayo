@@ -15,7 +15,7 @@ const resolveEndpoint = vi.fn();
 const compile = vi.fn();
 const compilePostmanCollection = vi.fn();
 
-vi.mock("@vayo/db-mongo", () => ({
+vi.mock("@vayo-hq/db-mongo", () => ({
   createAdapter: () => ({
     listEndpoints,
     listOverrides,
@@ -26,9 +26,9 @@ vi.mock("@vayo/db-mongo", () => ({
     listEnvironments,
   }),
 }));
-vi.mock("@vayo/schema-engine", () => ({ resolveEndpoint: (...args: unknown[]) => resolveEndpoint(...args) }));
-vi.mock("@vayo/openapi-compiler", () => ({ compile: (...args: unknown[]) => compile(...args) }));
-vi.mock("@vayo/server", () => ({ compilePostmanCollection: (...args: unknown[]) => compilePostmanCollection(...args) }));
+vi.mock("@vayo-hq/schema-engine", () => ({ resolveEndpoint: (...args: unknown[]) => resolveEndpoint(...args) }));
+vi.mock("@vayo-hq/openapi-compiler", () => ({ compile: (...args: unknown[]) => compile(...args) }));
+vi.mock("@vayo-hq/server", () => ({ compilePostmanCollection: (...args: unknown[]) => compilePostmanCollection(...args) }));
 vi.mock("../config.js", () => ({ requireMongoUri: () => "mongodb://localhost:27017/vayo" }));
 
 let tmpDir: string;

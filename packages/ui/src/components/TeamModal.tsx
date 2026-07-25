@@ -1,4 +1,4 @@
-// @vayo/ui — team roster + invites. Viewable by everyone (viewer+); only an
+// @vayo-hq/ui — team roster + invites. Viewable by everyone (viewer+); only an
 // owner can invite, change another member's role, remove a member, or
 // revoke a pending invite (docs/05-security.md §4, enforced server-side
 // regardless of what this UI shows or hides). Any member can rename
@@ -19,7 +19,7 @@
 
 import { useRef, useState } from "react";
 import { Pencil } from "lucide-react";
-import type { TeamRole } from "@vayo/types";
+import type { TeamRole } from "@vayo-hq/types";
 import { Modal } from "./Modal.js";
 import { Avatar } from "./Avatar.js";
 import { api, ApiError } from "../api.js";

@@ -1,5 +1,5 @@
 {
-  "name": "@vayo/server",
+  "name": "@vayo-hq/server",
   "version": "0.1.1-beta.0",
   "license": "MIT",
   "description": "REST API + Socket.IO gateway + static UI hosting. Every mutating route is role-checked server-side (docs/05-security.md).",
@@ -19,11 +19,11 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@vayo/db-mongo": "workspace:*",
-    "@vayo/openapi-compiler": "workspace:*",
-    "@vayo/schema-engine": "workspace:*",
-    "@vayo/types": "workspace:*",
-    "@vayo/ui": "workspace:*",
+    "@vayo-hq/db-mongo": "workspace:*",
+    "@vayo-hq/openapi-compiler": "workspace:*",
+    "@vayo-hq/schema-engine": "workspace:*",
+    "@vayo-hq/types": "workspace:*",
+    "@vayo-hq/ui": "workspace:*",
     "bcrypt": "^6.0.0",
     "express": "^4.19.0",
     "express-rate-limit": "^7.4.0",

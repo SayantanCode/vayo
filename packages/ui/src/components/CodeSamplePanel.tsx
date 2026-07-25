@@ -1,11 +1,11 @@
-// @vayo/ui — Details tab's sticky right-column code sample block
+// @vayo-hq/ui — Details tab's sticky right-column code sample block
 // (Redoc/Scalar/Stripe three-pane convention). Read-only: the "Try it →"
 // button switches to the existing Try It Now tab rather than sending a
 // live request itself, so exactly one place owns request-sending logic.
 
 import { useState } from "react";
 import { ArrowRight, Check, Copy } from "lucide-react";
-import type { ExampleDoc } from "@vayo/types";
+import type { ExampleDoc } from "@vayo-hq/types";
 import { requestBodySchema, type EndpointSummary } from "../types.js";
 import { exampleFromSchema } from "../example-from-schema.js";
 import { SNIPPET_LANGUAGES } from "../request-snippets.js";

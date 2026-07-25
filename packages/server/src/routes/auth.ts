@@ -1,4 +1,4 @@
-// @vayo/server — standalone auth mode (docs/05-security.md §5): login,
+// @vayo-hq/server — standalone auth mode (docs/05-security.md §5): login,
 // logout, and session introspection. Meaningless in delegated auth mode
 // (the host app owns sessions), so /api/auth/login 404s there instead of
 // silently doing nothing.

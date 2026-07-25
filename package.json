@@ -9,9 +9,9 @@
     "url": "git+https://github.com/SayantanCode/vayo.git"
   },
   "scripts": {
-    "build": "tsc -b && pnpm --filter @vayo/ui build",
+    "build": "tsc -b && pnpm --filter @vayo-hq/ui build",
     "clean": "tsc -b --clean",
-    "dev:demo": "pnpm --filter @vayo/demo-app dev",
+    "dev:demo": "pnpm --filter @vayo-hq/demo-app dev",
     "lint": "eslint . --ext .ts,.tsx",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "test": "vitest run",

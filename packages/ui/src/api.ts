@@ -1,5 +1,5 @@
-// @vayo/ui — thin typed fetch client for @vayo/server's REST API.
-// Never talks to MongoDB or any package below @vayo/server directly
+// @vayo-hq/ui — thin typed fetch client for @vayo-hq/server's REST API.
+// Never talks to MongoDB or any package below @vayo-hq/server directly
 // (docs/08-packages-and-repo-structure.md).
 
 import type {
@@ -16,8 +16,8 @@ import type {
   SettingsDoc,
   TeamRole,
   TestScriptDoc,
-} from "@vayo/types";
-import type { SpecDiff } from "@vayo/openapi-compiler";
+} from "@vayo-hq/types";
+import type { SpecDiff } from "@vayo-hq/openapi-compiler";
 import type { CoverageReport, CreatedInvite, CurrentMember, OpenApiDoc, PendingInvite, TeamMember } from "./types.js";
 
 export interface ApiConfig {

@@ -1,4 +1,4 @@
-// @vayo/ui — export menu: OpenAPI spec + Postman collection/environment
+// @vayo-hq/ui — export menu: OpenAPI spec + Postman collection/environment
 // downloads. Deliberately a plain client-side blob download rather than the
 // official "Run in Postman" embed button — that button needs a publicly
 // reachable, unauthenticated collection URL, which doesn't fit a

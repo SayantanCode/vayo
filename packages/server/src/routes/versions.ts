@@ -1,11 +1,11 @@
-// @vayo/server — spec resolution (GET /api/spec), API version lifecycle
+// @vayo-hq/server — spec resolution (GET /api/spec), API version lifecycle
 // (docs/07-api-versioning.md), and the breaking-change diff between two
 // versions.
 import { Router } from "express";
 import { z } from "zod";
-import { resolveEndpoint } from "@vayo/schema-engine";
-import { compile, diffSpecs, type CompileOptions } from "@vayo/openapi-compiler";
-import type { ExampleDoc, ResolvedEndpoint, VayoDbAdapter } from "@vayo/types";
+import { resolveEndpoint } from "@vayo-hq/schema-engine";
+import { compile, diffSpecs, type CompileOptions } from "@vayo-hq/openapi-compiler";
+import type { ExampleDoc, ResolvedEndpoint, VayoDbAdapter } from "@vayo-hq/types";
 import { requireRole, type VayoAuthedRequest } from "../auth-middleware.js";
 import { autoCatchAsyncErrors } from "../error-handling.js";
 import type { RouteDeps } from "../server-deps.js";

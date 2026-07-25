@@ -6,9 +6,9 @@
 
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { resolveEndpoint } from "@vayo/schema-engine";
-import { compile } from "@vayo/openapi-compiler";
-import { createAdapter } from "@vayo/db-mongo";
+import { resolveEndpoint } from "@vayo-hq/schema-engine";
+import { compile } from "@vayo-hq/openapi-compiler";
+import { createAdapter } from "@vayo-hq/db-mongo";
 
 const mongoUri = process.env.VAYO_MONGO_URI;
 if (!mongoUri) {

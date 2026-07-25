@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { JSONSchema } from "@vayo/types";
+import type { JSONSchema } from "@vayo-hq/types";
 import { exampleFromSchema } from "./example-from-schema.js";
 
 describe("exampleFromSchema", () => {

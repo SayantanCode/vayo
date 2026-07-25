@@ -1,4 +1,4 @@
-// @vayo/db-mongo
+// @vayo-hq/db-mongo
 // Native MongoDB driver (not Mongoose) — see docs/08-packages-and-repo-structure.md
 // for why: captured schemas are inherently variable-shape.
 
@@ -23,11 +23,11 @@ import {
   type TestRunResult,
   type TestScriptDoc,
   type VayoDbAdapter,
-} from "@vayo/types";
+} from "@vayo-hq/types";
 // Re-exported for backward compatibility — anything already importing
-// MAX_ATTACHMENT_BYTES from @vayo/db-mongo keeps working; @vayo/types is now
+// MAX_ATTACHMENT_BYTES from @vayo-hq/db-mongo keeps working; @vayo-hq/types is now
 // the one place this limit is actually defined (docs/03-data-model.md).
-export { MAX_ATTACHMENT_BYTES } from "@vayo/types";
+export { MAX_ATTACHMENT_BYTES } from "@vayo-hq/types";
 import {
   detectSchemaChange,
   mergeCapturedSample,
@@ -36,7 +36,7 @@ import {
   stableHash,
   MAX_EXAMPLES_PER_STATUS,
   type StaticRouteMergeInput,
-} from "@vayo/schema-engine";
+} from "@vayo-hq/schema-engine";
 import { GridFSBucket, MongoClient, ObjectId, type Db, type Document, type WithId } from "mongodb";
 
 /** Collection names — prefixed to avoid colliding with the user's own
@@ -68,7 +68,7 @@ export const COLLECTIONS = {
  * not a general-purpose blob bucket. */
 export const ATTACHMENTS_BUCKET = "vayo_attachments";
 
-/** Mongo's `_id` is an ObjectId; every shared type in @vayo/types models it
+/** Mongo's `_id` is an ObjectId; every shared type in @vayo-hq/types models it
  * as `string`. This is the one place that boundary gets crossed. */
 function fromMongo<T extends { _id: string }>(doc: WithId<Document>): T {
   const { _id, ...rest } = doc;
@@ -150,7 +150,7 @@ function attachmentFromGridFSFile(file: GridFSFileDoc): AttachmentDoc {
  * (docs/03-data-model.md per-collection "Indexes" notes). Idempotent — safe
  * to run on every `vayo init` / server boot. Opens and closes its own
  * connection; independent of `createAdapter` since a future
- * `@vayo/db-postgres` would have its own migration mechanism entirely, not
+ * `@vayo-hq/db-postgres` would have its own migration mechanism entirely, not
  * a shared one across the `VayoDbAdapter` interface.
  */
 export async function runMigrations(mongoUri: string): Promise<void> {
@@ -164,7 +164,7 @@ export async function runMigrations(mongoUri: string): Promise<void> {
 }
 
 /**
- * Implements `VayoDbAdapter` (@vayo/types) against the native MongoDB
+ * Implements `VayoDbAdapter` (@vayo-hq/types) against the native MongoDB
  * driver. Reads `mongoUri` once at call time — never logs it
  * (docs/05-security.md §7). Connects lazily on first use and reuses one
  * connection for the adapter's lifetime.
@@ -762,7 +762,7 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
       // Resolves (creating as needed, level by level) the folder id for a
       // "/"-separated group path — e.g. "Admin/Users" walks/creates a
       // top-level "Admin" folder, then a "Users" sub-folder inside it,
-      // returning the deepest (leaf) folder's id. `@vayo/ast`'s
+      // returning the deepest (leaf) folder's id. `@vayo-hq/ast`'s
       // `inferGroup` (docs/04-capture-engine.md Step 2 #4) is what actually
       // produces multi-segment group paths, from a nested `routes/`
       // directory layout; a flat, single-segment group still resolves to
@@ -873,7 +873,7 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
       if (!raw) return { _id: "", ...empty };
       // Backfills fields added to SettingsDoc after this document was last
       // written (same reasoning as resolveEndpoint's own backfill,
-      // @vayo/schema-engine) — a real, reachable case for any install
+      // @vayo-hq/schema-engine) — a real, reachable case for any install
       // upgrading to a version with these newer fields, until settings are
       // next saved through the UI.
       return { ...empty, ...fromMongo<SettingsDoc>(raw) };
@@ -945,7 +945,7 @@ export function createAdapter(mongoUri: string): VayoDbAdapter {
     // caller either wants the mixed list directly (the UI's
     // mostRecentOrPinned prefers a pinned one, falling back to the most
     // recent capture) or filters down to `.pinned` itself (the Postman
-    // export in both @vayo/server and vayo) — never pre-filter here.
+    // export in both @vayo-hq/server and vayo) — never pre-filter here.
     async listExamples(vayoId: string): Promise<ExampleDoc[]> {
       const db = await getDb();
       const raws = await db

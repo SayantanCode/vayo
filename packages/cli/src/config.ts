@@ -1,12 +1,12 @@
 // vayo — loads the user's vayo.config.js. Plain JS/ESM, not .ts: the
 // CLI ships as compiled JS with no TS loader bundled, and a bare import() of
-// a .js file needs none — the same mechanism @vayo/ast's scanProject
+// a .js file needs none — the same mechanism @vayo-hq/ast's scanProject
 // already uses successfully for the user's own app entry.
 
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import type { VayoConfig } from "@vayo/ast";
+import type { VayoConfig } from "@vayo-hq/ast";
 
 export const DEFAULT_CONFIG_PATH = "vayo.config.js";
 

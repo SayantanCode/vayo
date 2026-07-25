@@ -1,4 +1,4 @@
-// @vayo/ast
+// @vayo-hq/ast
 // Static analysis pass — docs/04-capture-engine.md Step 2 and §3a.
 // Framework-specific bootstrapping (getting a live `app` instance) is
 // isolated behind the adapter path passed in via VayoConfig; this module's
@@ -10,7 +10,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import expressListEndpoints from "express-list-endpoints";
 import { Node, Project, SyntaxKind, type CallExpression, type SourceFile } from "ts-morph";
-import type { JSONSchema } from "@vayo/types";
+import type { JSONSchema } from "@vayo-hq/types";
 
 export const DEFAULT_AUTH_MIDDLEWARE_PATTERNS = [
   "authenticate",
@@ -125,7 +125,7 @@ function unwrapApp(mod: { default?: unknown; app?: unknown }): unknown {
  * route registered from a file under `routes/orders/*.ts` -> "Orders", and
  * one under `routes/admin/users/*.ts` -> "Admin/Users" — every directory
  * segment between `routes/` and the file itself becomes one level of the
- * "/"-separated group path, so `@vayo/db-mongo`'s `autoOrganizeFolders` can
+ * "/"-separated group path, so `@vayo-hq/db-mongo`'s `autoOrganizeFolders` can
  * turn a nested route-file layout into real nested sidebar folders instead
  * of flattening it to one level. Falls back to the first meaningful path
  * segment (never nested — a URL's own segments aren't a reliable
@@ -1109,7 +1109,7 @@ export async function scanProject(rootDir: string, config: VayoConfig): Promise<
   const app = unwrapApp(mod);
   if (!app) {
     throw new Error(
-      `@vayo/ast: ${config.appEntryPath} must export a bootstrapped Express app as "export default app" or "export const app"`,
+      `@vayo-hq/ast: ${config.appEntryPath} must export a bootstrapped Express app as "export default app" or "export const app"`,
     );
   }
 

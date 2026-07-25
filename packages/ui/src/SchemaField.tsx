@@ -1,4 +1,4 @@
-// @vayo/ui — SchemaField: the one recursive primitive that renders any
+// @vayo-hq/ui — SchemaField: the one recursive primitive that renders any
 // JSON Schema shape. No per-endpoint JSX — the Details tab, the response
 // viewer, and (indirectly) the Try It form's field list all reuse this.
 //
@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, Pencil, X } from "lucide-react";
-import type { JSONSchema } from "@vayo/types";
+import type { JSONSchema } from "@vayo-hq/types";
 import type { ApiConfig } from "./api.js";
 import { api } from "./api.js";
 

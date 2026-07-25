@@ -1,4 +1,4 @@
-// @vayo/ui — the sandboxed script execution environment. Runs entirely
+// @vayo-hq/ui — the sandboxed script execution environment. Runs entirely
 // inside a Web Worker, which is what provides the isolation: a worker has
 // no access to `window`, `document`, `localStorage`, cookies, or the page's
 // own same-origin fetch — that's a property of the Worker global scope
@@ -91,7 +91,7 @@ function expect(actual: unknown): Assertion {
   return new Assertion(actual);
 }
 
-// @vayo/ui's tsconfig uses the "DOM" lib (for the rest of the app), which
+// @vayo-hq/ui's tsconfig uses the "DOM" lib (for the rest of the app), which
 // types the ambient `self` as `Window` — not the `DedicatedWorkerGlobalScope`
 // this file actually runs as. Rather than giving this one file its own
 // "WebWorker"-lib tsconfig (which conflicts with "DOM" if both are ever

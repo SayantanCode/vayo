@@ -1,13 +1,13 @@
-# @vayo/capture-express
+# @vayo-hq/capture-express
 
 Express middleware that captures real request/response traffic and turns
 it into Vayo's inferred schemas — the "zero manual annotation" half of the
 pipeline (the other half is
-[`@vayo/ast`](https://www.npmjs.com/package/@vayo/ast)'s static pass).
+[`@vayo-hq/ast`](https://www.npmjs.com/package/@vayo-hq/ast)'s static pass).
 
 ```js
-const { capture } = require("@vayo/capture-express"); // or `import` for ESM
-const { createAdapter } = require("@vayo/db-mongo");
+const { capture } = require("@vayo-hq/capture-express"); // or `import` for ESM
+const { createAdapter } = require("@vayo-hq/db-mongo");
 
 const db = createAdapter(process.env.VAYO_MONGO_URI);
 app.use(capture({ db }));

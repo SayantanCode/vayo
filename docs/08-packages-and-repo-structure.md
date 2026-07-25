@@ -9,14 +9,14 @@ vayo/
 ├── tsconfig.base.json
 ├── docs/                        (this documentation set)
 ├── packages/
-│   ├── shared-types/            @vayo/types
-│   ├── capture-express/         @vayo/capture-express
-│   ├── ast/                     @vayo/ast
-│   ├── schema-engine/           @vayo/schema-engine
-│   ├── openapi-compiler/        @vayo/openapi-compiler
-│   ├── db-mongo/                @vayo/db-mongo
-│   ├── server/                  @vayo/server
-│   ├── ui/                      @vayo/ui
+│   ├── shared-types/            @vayo-hq/types
+│   ├── capture-express/         @vayo-hq/capture-express
+│   ├── ast/                     @vayo-hq/ast
+│   ├── schema-engine/           @vayo-hq/schema-engine
+│   ├── openapi-compiler/        @vayo-hq/openapi-compiler
+│   ├── db-mongo/                @vayo-hq/db-mongo
+│   ├── server/                  @vayo-hq/server
+│   ├── ui/                      @vayo-hq/ui
 │   └── cli/                     vayo
 └── apps/
     └── demo-app/                 example Express app for local end-to-end dev
@@ -26,20 +26,20 @@ pnpm workspaces + TypeScript project references (`tsconfig.base.json` +
 per-package `tsconfig.json` with `references`) handle build ordering. No
 Turborepo/Nx for v1 — revisit once build time or contributor count justifies it.
 
-## `@vayo/types`
+## `@vayo-hq/types`
 
 Pure type-only package. No runtime code. Exports every interface defined in
 `03-data-model.md` (`CapturedSample`, `EndpointDoc`, `OverrideDoc`, etc.) plus
 the `ResolvedEndpoint` and `ResolvedSpec` shapes. Every other package depends on
 this one; it depends on nothing.
 
-## `@vayo/capture-express`
+## `@vayo-hq/capture-express`
 
 ```typescript
 export function capture(options: CaptureOptions): express.RequestHandler;
 
 interface CaptureOptions {
-  db: VayoDbAdapter;              // from @vayo/db-mongo
+  db: VayoDbAdapter;              // from @vayo-hq/db-mongo
   redact?: string[];                 // additive to default deny-list, 05-security.md §2
   authMiddlewarePatterns?: string[]; // additive to default list, 04-capture-engine.md §2
   authMiddleware?: (req: Request) => AuthResult; // delegated docs-viewer auth, 05-security.md §5
@@ -47,7 +47,7 @@ interface CaptureOptions {
 ```
 
 The **only** package allowed to import Express types. Emits `CapturedSample`
-(from `@vayo/types`) and hands it to `@vayo/schema-engine` — never talks
+(from `@vayo-hq/types`) and hands it to `@vayo-hq/schema-engine` — never talks
 to MongoDB directly, only through the `VayoDbAdapter` interface, so it stays
 unit-testable without a real database.
 
@@ -58,7 +58,7 @@ which this peer range rejects. Consumers must install `express@^4` explicitly.
 Not a bug to fix here — a deliberate v1 scope boundary that needs to be
 stated plainly in end-user setup docs, since it's the kind of thing that
 only surfaces once someone installs for real. The specific reason it's
-Express-4-only, not just an unverified guess: `@vayo/ast`'s
+Express-4-only, not just an unverified guess: `@vayo-hq/ast`'s
 `express-list-endpoints` dependency has its own test suite pinned to
 Express 4 with no Express 5 coverage, and Express 5 rewrote router
 internals (path-to-regexp version, wildcard route syntax, `Layer` shape) —
@@ -76,7 +76,7 @@ thrown error — some Express 5 apps might partially work, and refusing to
 run at all over an unverified peer would be worse than the risk it guards
 against.
 
-## `@vayo/ast`
+## `@vayo-hq/ast`
 
 ```typescript
 export function scanProject(rootDir: string, config: VayoConfig): StaticScanResult;
@@ -88,7 +88,7 @@ the CLI generates per project — the AST logic itself doesn't assume Express
 beyond that one adapter boundary, so a future Fastify AST adapter is a small
 addition, not a rewrite.
 
-## `@vayo/schema-engine`
+## `@vayo-hq/schema-engine`
 
 ```typescript
 export function mergeCapturedSample(existing: EndpointDoc | null, sample: CapturedSample): EndpointDoc;
@@ -96,11 +96,11 @@ export function resolveEndpoint(endpoint: EndpointDoc, overrides: OverrideDoc[])
 ```
 
 Wraps `genson-js` for schema inference/merging. Framework-agnostic — consumes
-only `@vayo/types` shapes. `resolveEndpoint` is the pure merge function
+only `@vayo-hq/types` shapes. `resolveEndpoint` is the pure merge function
 described in `03-data-model.md` — no side effects, no I/O, exhaustively unit
 tested with fixtures before anything else in the system depends on it.
 
-## `@vayo/openapi-compiler`
+## `@vayo-hq/openapi-compiler`
 
 ```typescript
 export function compile(endpoints: ResolvedEndpoint[], version: string, options?: CompileOptions): OpenAPIDocument;
@@ -115,7 +115,7 @@ the original default behavior) sources `info.title`/`info.description`/
 `servers` from `vayo_settings`/`vayo_environments` — see `03-data-model.md`
 "`vayo_settings`".
 
-## `@vayo/db-mongo`
+## `@vayo-hq/db-mongo`
 
 ```typescript
 export function createAdapter(mongoUri: string): VayoDbAdapter;
@@ -126,7 +126,7 @@ Uses the native MongoDB driver (not Mongoose) — captured schemas are inherentl
 dynamic/arbitrary shapes, which is the opposite of what an ODM's fixed-schema
 model is good at; the native driver's flexibility is the right fit here.
 `VayoDbAdapter` is the interface every other package codes against, so a
-future `@vayo/db-postgres` is a drop-in alternative implementation, not a
+future `@vayo-hq/db-postgres` is a drop-in alternative implementation, not a
 rewrite of every consumer.
 
 Beyond the M1-M5 CRUD, `VayoDbAdapter` also covers the Postman-parity
@@ -149,14 +149,14 @@ Team Chat attachments (`03-data-model.md`) add `uploadAttachment`/
 `getAttachment`/`downloadAttachment`/`listAttachments`/`claimAttachments`/
 `deleteUnclaimedAttachment`, backed by GridFS (`GridFSBucket`, already part
 of the `mongodb` driver dependency this package already has — no new
-storage dependency). These are the one place `@vayo/types`' own
+storage dependency). These are the one place `@vayo-hq/types`' own
 "zero dependencies" rule got a second look: `uploadAttachment`'s file data
 is typed `Uint8Array` and `downloadAttachment`'s stream is typed `unknown`,
-specifically so `@vayo/types` never needs `@types/node` — `@vayo/server`
+specifically so `@vayo-hq/types` never needs `@types/node` — `@vayo-hq/server`
 casts the opaque stream back to a real Node stream at the one call site
 that pipes it to a response.
 
-## `@vayo/server`
+## `@vayo-hq/server`
 
 ```typescript
 export function createServer(options: ServerOptions): VayoServerHandle;
@@ -180,7 +180,7 @@ interface VayoServerHandle {
 
 REST API (spec resolution, overrides, comments, team/invites, versions) +
 embedded Socket.IO gateway (`06-realtime-collaboration.md`) + serves the built
-`@vayo/ui` static assets. Every mutating route wrapped in `requireRole(...)`
+`@vayo-hq/ui` static assets. Every mutating route wrapped in `requireRole(...)`
 per `05-security.md` §4 — this is the one package where a missing role check is
 a real vulnerability, not a UX bug, so it gets the most thorough test coverage
 of any package.
@@ -239,7 +239,7 @@ exact Socket.IO path it's about to use, so a real conflict is a loud,
 explained one at startup rather than a connection silently misbehaving
 later (`06-realtime-collaboration.md`).
 
-Serving the UI is more than `express.static`: `@vayo/ui` builds into TWO
+Serving the UI is more than `express.static`: `@vayo-hq/ui` builds into TWO
 separate output directories from ONE source tree, because it has two
 genuinely different consumers. `dist/` (`tsc -b`, `main`/`types` fields) is
 the library entry — a host app that wants to import `<DocsApp>` directly into
@@ -251,10 +251,10 @@ whatever `mountPath` a given deployment chose, not just the default `/vayo`.
 The one thing a static build can't know ahead of time is *which* mountPath
 that is, so `createServer` injects `window.__VAYO_MOUNT_PATH__` into
 `dist-app/index.html` at serve time (a plain string replace before
-`</head>`, not a template engine), and `@vayo/ui`'s own `main.tsx` reads it
+`</head>`, not a template engine), and `@vayo-hq/ui`'s own `main.tsx` reads it
 at startup to compute `apiBaseUrl`/`socketUrl` — falling back to the
 hardcoded `localhost:4100` dev values when the global isn't present, i.e.
-exactly `pnpm dev`'s existing behavior. If `@vayo/ui` was only ever
+exactly `pnpm dev`'s existing behavior. If `@vayo-hq/ui` was only ever
 `tsc -b`'d and never `vite build`'t (no `dist-app/index.html` on disk),
 `createServer` degrades to API-only rather than throwing — the same "a
 missing optional piece must never take down the real service" posture as
@@ -269,12 +269,12 @@ saved responses (`/api/examples/:vayoId`), test scripts
 the existing OpenAPI spec endpoint) — same `requireRole` pattern throughout.
 Postman Collection/Environment compilation lives in a colocated
 `postman-export.ts` module rather than its own package, since nothing else
-depends on that format the way things depend on `@vayo/openapi-compiler`'s
+depends on that format the way things depend on `@vayo-hq/openapi-compiler`'s
 OpenAPI output.
 
 M6 (`07-api-versioning.md`) adds `/api/versions` (list/create/patch lifecycle
 status) and `/api/diff?from=&to=`, the latter compiling both versions through
-the same pipeline as `/api/spec` and running `@vayo/openapi-compiler`'s
+the same pipeline as `/api/spec` and running `@vayo-hq/openapi-compiler`'s
 `diffSpecs`. Same `requireRole` pattern: viewer can read both, only editor+
 can create a version or change its status.
 
@@ -342,8 +342,8 @@ the GridFS read stream through — the one route that also accepts
 calls `db.claimAttachments` right after creating the comment, and also
 extracts `@[Name](memberId)` tokens from the body
 (`extractMentionedMemberIds`, a small regex — the richer parsing for
-autocomplete/rendering lives client-side in `@vayo/ui`'s `mentions.ts`,
-duplicated rather than shared since `@vayo/server` and `@vayo/ui` don't
+autocomplete/rendering lives client-side in `@vayo-hq/ui`'s `mentions.ts`,
+duplicated rather than shared since `@vayo-hq/server` and `@vayo-hq/ui` don't
 depend on each other) to populate the comment notification's
 `mentionedMemberIds`.
 
@@ -360,7 +360,7 @@ collection. Realtime broadcast follows the same fan-out: `comment:new` goes
 to every tagged endpoint's own `endpoint:{vayoId}` room, plus the shared
 `project` room when there are 2+ (`06-realtime-collaboration.md`).
 
-## `@vayo/ui`
+## `@vayo-hq/ui`
 
 Schema-driven React, per your explicit call to build fully custom rather than
 prototype on a third-party renderer. Core primitive:
@@ -431,8 +431,8 @@ customization for teams that want to override specific panels:
 />
 ```
 
-Talks to `@vayo/server`'s REST API and Socket.IO gateway — never touches
-MongoDB or any package below `@vayo/server` directly.
+Talks to `@vayo-hq/server`'s REST API and Socket.IO gateway — never touches
+MongoDB or any package below `@vayo-hq/server` directly.
 
 Beyond the five endpoint tabs, the sidebar is a real drag-and-drop folder
 tree (`@dnd-kit`) with inline rename and a create/rename/delete/move context
@@ -624,7 +624,7 @@ demo-app script requires today).
 npx vayo init                      # prompts for Mongo URI + AST-entry path,
                                     # writes .env + vayo.config.js + a starter
                                     # AST-entry file, runs migrations
-npx vayo scan [--config <path>]    # @vayo/ast static pass, merges vayo_endpoints,
+npx vayo scan [--config <path>]    # @vayo-hq/ast static pass, merges vayo_endpoints,
                                     # then auto-organizes detected groups into folders
 npx vayo export [--version v1] [--format openapi|postman] [--out <path>]
 npx vayo import <file> [--version v1] [--overwrite]   # enrich already-discovered
@@ -637,7 +637,7 @@ npx vayo diff <from> <to> [--fail-on-breaking] # CI-friendly breaking-change gat
 
 `vayo.config.js` is deliberately plain JS, not `.ts` — the CLI ships as
 compiled JS with no TS loader bundled in, and a bare `import()` of a `.js`
-file needs none (the same mechanism `@vayo/ast`'s `scanProject` already uses
+file needs none (the same mechanism `@vayo-hq/ast`'s `scanProject` already uses
 for the user's own app entry). A JSDoc `@type` comment gives editor
 autocomplete without requiring a build step. `init` generates it (and the
 AST-entry placeholder, and the printed wiring snippet) as ESM `export
@@ -654,7 +654,7 @@ the one wiring step it can't safely automate: mounting `capture()` into
 whatever file the user actually calls `app.listen()` from. Auto-rewriting
 code this package doesn't own is exactly the kind of risky default to avoid.
 
-Every one-shot command that opens `@vayo/db-mongo`'s `createAdapter` (`scan`,
+Every one-shot command that opens `@vayo-hq/db-mongo`'s `createAdapter` (`scan`,
 `export`, `create-owner` — not `init`, which only ever touches `runMigrations`'s
 own short-lived, self-closing client) force-exits with `process.exit()` at
 the end. `createAdapter`'s `MongoClient` has no public `close()` — it's built
@@ -665,9 +665,9 @@ error case (an email that's already registered) before that final
 `process.exit()` specifically so the message still reaches the terminal
 instead of silently hanging.
 
-`vayo export --format postman` and `vayo diff` reuse `@vayo/server`'s own
+`vayo export --format postman` and `vayo diff` reuse `@vayo-hq/server`'s own
 `compilePostmanCollection`/`diffSpecs` logic directly against the database —
-re-exported from `@vayo/server`'s public entry specifically so the CLI never
+re-exported from `@vayo-hq/server`'s public entry specifically so the CLI never
 needs a running server just to compile or diff a spec.
 
 `vayo import <file>` is a migration/onboarding aid, not a parallel authoring
@@ -685,12 +685,12 @@ spec operation with no matching endpoint is reported unmatched, not
 created. Every enriched field is written through the ordinary
 `vayo_overrides` mechanism (skipped when one already exists, unless
 `--overwrite`) — the pure matching/extraction logic
-(`@vayo/openapi-compiler`'s `planOpenApiImport`) is fully unit-tested
+(`@vayo-hq/openapi-compiler`'s `planOpenApiImport`) is fully unit-tested
 without touching a database at all; this command is the thin I/O layer on
 top, the same "plan here, apply there" split `compile()`/`diffSpecs`
 already follow. Deliberately v1-scoped: JSON input only (no YAML yet — a
 clean follow-up via `@apidevtools/swagger-parser`'s own loader, already a
-`@vayo/openapi-compiler` dependency), and parameter-level descriptions
+`@vayo-hq/openapi-compiler` dependency), and parameter-level descriptions
 aren't imported (only request/response body schema fields).
 
 ## Enforcing the framework-agnostic boundary in code, not just docs
@@ -701,12 +701,12 @@ anything from `express` or `capture-express`. This is cheap to set up and is
 what actually guarantees `01-vision-and-market.md`'s "other stacks later"
 claim stays true as the codebase grows past what one person can manually review.
 
-Note `@vayo/server` is deliberately *not* in this list, even though the same
-principle sounds like it should apply: `@vayo/server` is Vayo's own REST
+Note `@vayo-hq/server` is deliberately *not* in this list, even though the same
+principle sounds like it should apply: `@vayo-hq/server` is Vayo's own REST
 API/dashboard server (`createServer(): { app: express.Express; ... }` above),
 built on Express as its own implementation choice — a different thing
 entirely from "the *user's captured app* might be on a different framework,"
 which is what this boundary actually protects against. `capture-express`
 is "the only package allowed to import Express types" in that
-user's-app-facing sense; `@vayo/server` using Express to build its own
+user's-app-facing sense; `@vayo-hq/server` using Express to build its own
 server is orthogonal to that and not a violation.
