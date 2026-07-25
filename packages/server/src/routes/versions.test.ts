@@ -103,7 +103,7 @@ describe("api versions + diff + spec", () => {
 
     await request(app)
       .post(`/api/examples/${vayoId}/pin`)
-      .set("Authorization", `Bearer ${token}`)
+      .set("Authorization", `Bearer ${editorToken}`)
       .send({ statusCode: 200, requestBody: null, responseBody: { id: "abc123" }, label: "Successful list" });
 
     const spec = await request(app).get("/api/spec?version=v1").set("Authorization", `Bearer ${token}`);
