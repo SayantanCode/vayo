@@ -1,5 +1,27 @@
 # @vayo/ast
 
+## 0.1.1-beta.1
+
+### Patch Changes
+
+- 04879f9: Renamed the npm scope from `@vayo` to `@vayo-hq` — the `@vayo` organization
+  name was already taken on npmjs.com by an unrelated party, discovered while
+  setting up npm Trusted Publishing ahead of the first real publish. No
+  package was ever actually published under the old scope (every `@vayo/*`
+  name still 404s on the registry), so this is a pure rename with zero real
+  consumers to break: `npm install @vayo-hq/types`, `npm install
+@vayo-hq/server`, etc. The bare `vayo` CLI package (no scope) is unaffected
+  either way.
+- 130aa3e: Updated READMEs to document capabilities that had landed in code but never
+  made it into the package docs: `@vayo-hq/ast`'s optional JSDoc tags
+  (`@group`/`@deprecated`/`@response`/`@example`/`@description`),
+  `@vayo-hq/openapi-compiler`'s `compile()` `title`/`description`/`servers`
+  options and `planOpenApiImport`, `@vayo-hq/ui`'s Coverage/Flows/Settings/Chat/
+  Export surfaces, and the `vayo` CLI's `vayo import` command.
+- Updated dependencies [c8cd29c]
+- Updated dependencies [04879f9]
+  - @vayo-hq/types@0.1.1-beta.1
+
 ## 0.1.1-beta.0
 
 ### Patch Changes
