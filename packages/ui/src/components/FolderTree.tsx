@@ -86,6 +86,13 @@ interface FolderTreeProps {
    * any other failed action already uses), rather than the drag silently
    * doing nothing with no explanation. */
   onBlockedMove: (message: string) => void;
+  /** True until the first spec/folders fetch resolves — an empty `tree`
+   * during that window means "haven't heard back yet," not "there's
+   * nothing here," so this keeps the sidebar from flashing "No endpoints
+   * yet" for a real project that's just slow to answer (a large API can
+   * take several real seconds), before the actual data arrives moments
+   * later and replaces it. */
+  isLoading?: boolean;
 }
 
 function nodeIdentity(node: TreeNode): { kind: "folder" | "endpoint"; id: string; label: string; method?: string } {
@@ -546,7 +553,11 @@ export function FolderTree(props: FolderTreeProps): JSX.Element {
         </DragOverlay>
       </DndContext>
 
-      {rows.length === 0 && <p className="sidebar__empty muted">No endpoints yet.</p>}
+      {rows.length === 0 && (props.isLoading ? (
+        <p className="sidebar__empty muted">Loading endpoints…</p>
+      ) : (
+        <p className="sidebar__empty muted">No endpoints yet.</p>
+      ))}
 
       {props.canEdit && (
         <button type="button" className="sidebar__new-endpoint" onClick={() => props.onCreateEndpoint(null)}>

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CapturedSample, EndpointDoc, OverrideDoc } from "@vayo-hq/types";
 import {
   detectSchemaChange,
+  mapWithConcurrency,
   mergeCapturedSample,
   mergeStaticResult,
   resolveAuthRequired,
@@ -755,5 +756,41 @@ describe("resolveEndpoint", () => {
     const resolved = resolveEndpoint(rescanned, [override]);
     expect(resolved.summary).toBe("Manually written summary.");
     expect((resolved.responseSchemas["200"] as any).properties.newField).toBeDefined();
+  });
+});
+
+describe("mapWithConcurrency", () => {
+  it("maps every item and preserves result order regardless of completion order", async () => {
+    const delays = [30, 10, 20, 0, 15];
+    const result = await mapWithConcurrency(delays, 3, async (delay, index) => {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return index * 2;
+    });
+    expect(result).toEqual([0, 2, 4, 6, 8]);
+  });
+
+  it("never runs more than `concurrency` items at once", async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const items = Array.from({ length: 20 }, (_, i) => i);
+
+    await mapWithConcurrency(items, 4, async () => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight--;
+    });
+
+    expect(maxInFlight).toBeLessThanOrEqual(4);
+  });
+
+  it("handles an empty list without error", async () => {
+    const result = await mapWithConcurrency([], 10, async (x) => x);
+    expect(result).toEqual([]);
+  });
+
+  it("handles concurrency greater than the item count", async () => {
+    const result = await mapWithConcurrency([1, 2, 3], 100, async (x) => x * 10);
+    expect(result).toEqual([10, 20, 30]);
   });
 });

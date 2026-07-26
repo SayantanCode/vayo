@@ -541,3 +541,32 @@ export function resolveEndpoint(
 
   return { ...(result as unknown as EndpointDoc), overridden };
 }
+
+/** Bounded-concurrency version of `Promise.all`, used everywhere an
+ * endpoint list gets resolved (GET /api/spec, /api/diff, `vayo export`,
+ * `vayo diff`) via one DB round-trip per endpoint (`listOverrides`,
+ * `listExamples`, etc.). A real, large API can have hundreds of endpoints;
+ * running that many round-trips fully sequentially is safe but measured
+ * taking minutes against a real remote MongoDB cluster, and firing them all
+ * at once via a plain `Promise.all` risks overwhelming the database's own
+ * connection pool. This runs a fixed number of workers, each pulling the
+ * next item off a shared index, splitting the difference. */
+export async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await fn(items[index]!, index);
+    }
+  }
+
+  const workerCount = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: workerCount }, worker));
+  return results;
+}

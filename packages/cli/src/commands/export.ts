@@ -6,11 +6,18 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import type { ExampleDoc, ResolvedEndpoint, TestScriptDoc } from "@vayo-hq/types";
-import { resolveEndpoint } from "@vayo-hq/schema-engine";
+import { resolveEndpoint, mapWithConcurrency } from "@vayo-hq/schema-engine";
 import { compile } from "@vayo-hq/openapi-compiler";
 import { compilePostmanCollection } from "@vayo-hq/server";
 import { createAdapter } from "@vayo-hq/db-mongo";
 import { requireMongoUri } from "../config.js";
+
+/** How many per-endpoint reads (examples, test scripts) run at once. A real
+ * API can have hundreds of endpoints; sequential (one-at-a-time) awaiting
+ * measured taking minutes against a real remote MongoDB cluster on a 600+
+ * endpoint production API — bounded concurrency instead of a plain
+ * `Promise.all` to avoid overwhelming the database's own connection pool. */
+const FETCH_CONCURRENCY = 20;
 
 export interface ExportOptions {
   version: string;
@@ -23,8 +30,8 @@ export async function exportCommand(options: ExportOptions): Promise<void> {
   const db = createAdapter(mongoUri);
 
   const endpoints = await db.listEndpoints(options.version);
-  const resolved: ResolvedEndpoint[] = await Promise.all(
-    endpoints.map(async (endpoint) => resolveEndpoint(endpoint, await db.listOverrides(endpoint.vayoId))),
+  const resolved: ResolvedEndpoint[] = await mapWithConcurrency(endpoints, FETCH_CONCURRENCY, async (endpoint) =>
+    resolveEndpoint(endpoint, await db.listOverrides(endpoint.vayoId)),
   );
 
   // The equivalent of swagger-jsdoc's static options.definition.info/servers
@@ -39,22 +46,22 @@ export async function exportCommand(options: ExportOptions): Promise<void> {
   // — shared by both export formats so a team's saved Try It Now responses
   // show up in the OpenAPI export exactly as they already did in Postman's.
   const pinnedExamples = new Map<string, ExampleDoc[]>();
-  for (const endpoint of resolved) {
+  await mapWithConcurrency(resolved, FETCH_CONCURRENCY, async (endpoint) => {
     const pinned = (await db.listExamples(endpoint.vayoId)).filter((e) => e.pinned);
     if (pinned.length > 0) pinnedExamples.set(endpoint.vayoId, pinned);
-  }
+  });
 
   if (options.format === "postman") {
     const folders = await db.listFolders(options.version);
     const placements = new Map<string, string | null>();
     const testScripts = new Map<string, TestScriptDoc>();
-    for (const endpoint of resolved) {
+    await mapWithConcurrency(resolved, FETCH_CONCURRENCY, async (endpoint) => {
       const folderId = (endpoint as unknown as { folderId?: string | null }).folderId ?? null;
       placements.set(endpoint.vayoId, folderId);
 
       const script = await db.getTestScript(endpoint.vayoId);
       if (script) testScripts.set(endpoint.vayoId, script);
-    }
+    });
     const collection = compilePostmanCollection(
       `${settings.title} (${options.version})`,
       resolved,

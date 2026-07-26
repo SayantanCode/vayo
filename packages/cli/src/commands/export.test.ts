@@ -26,7 +26,10 @@ vi.mock("@vayo-hq/db-mongo", () => ({
     listEnvironments,
   }),
 }));
-vi.mock("@vayo-hq/schema-engine", () => ({ resolveEndpoint: (...args: unknown[]) => resolveEndpoint(...args) }));
+vi.mock("@vayo-hq/schema-engine", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@vayo-hq/schema-engine")>();
+  return { ...actual, resolveEndpoint: (...args: unknown[]) => resolveEndpoint(...args) };
+});
 vi.mock("@vayo-hq/openapi-compiler", () => ({ compile: (...args: unknown[]) => compile(...args) }));
 vi.mock("@vayo-hq/server", () => ({ compilePostmanCollection: (...args: unknown[]) => compilePostmanCollection(...args) }));
 vi.mock("../config.js", () => ({ requireMongoUri: () => "mongodb://localhost:27017/vayo" }));

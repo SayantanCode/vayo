@@ -4,8 +4,15 @@
 
 import { scanProject } from "@vayo-hq/ast";
 import { createAdapter } from "@vayo-hq/db-mongo";
-import { resolveVersion } from "@vayo-hq/schema-engine";
+import { resolveVersion, mapWithConcurrency } from "@vayo-hq/schema-engine";
 import { loadConfig, requireMongoUri } from "../config.js";
+
+/** How many `upsertStaticResult` writes run at once. A real API can have
+ * hundreds of routes; sequential (one-at-a-time) awaiting measured taking
+ * minutes against a real remote MongoDB cluster on a 600+ route production
+ * API — bounded concurrency instead of a plain `Promise.all` to avoid
+ * overwhelming the database's own connection pool. */
+const UPSERT_CONCURRENCY = 20;
 
 export interface ScanOptions {
   config?: string;
@@ -25,7 +32,7 @@ export async function scanCommand(options: ScanOptions): Promise<void> {
   const groups = new Set<string>();
   const versionsTouched = new Set<string>();
   const confirmedVayoIdsByVersion = new Map<string, string[]>();
-  for (const route of result.routes) {
+  await mapWithConcurrency(result.routes, UPSERT_CONCURRENCY, async (route) => {
     const version = resolveVersion(route.pathTemplate, configuredVersions);
     const saved = await db.upsertStaticResult(route, version);
     groups.add(route.group);
@@ -36,7 +43,7 @@ export async function scanCommand(options: ScanOptions): Promise<void> {
     console.log(
       `merged ${route.method} ${route.pathTemplate} (${version}) — scopes=${JSON.stringify(route.scopes)} middlewareChain=${JSON.stringify(route.middlewareChain)}`,
     );
-  }
+  });
 
   console.log(`\nvayo: scanned ${result.routes.length} route(s) across ${groups.size} group(s).`);
 
