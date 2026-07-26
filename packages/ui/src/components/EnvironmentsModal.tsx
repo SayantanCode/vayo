@@ -39,20 +39,45 @@ export function EnvironmentsModal({ environments, onCreate, onUpdate, onDelete, 
 
   const [name, setName] = useState(selected?.name ?? "");
   const [rows, setRows] = useState<VarRow[]>(toRows(selected?.variables ?? {}));
+  // Guards against a double-click firing save() twice before the first
+  // request even resolves — with nothing to disable the button in between,
+  // both calls read the identical name/variables and create two duplicate
+  // environments (both selectedId and the typed name are unchanged until the
+  // first call actually completes).
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function select(id: string | "new") {
     setSelectedId(id);
     const env = id !== "new" ? (environments.find((e) => e._id === id) ?? null) : null;
     setName(env?.name ?? "");
     setRows(toRows(env?.variables ?? {}));
+    setError(null);
   }
 
   async function save() {
-    const variables = toVariables(rows);
-    if (selectedId === "new") {
-      await onCreate(name.trim() || "New environment", variables);
-    } else if (selected) {
-      await onUpdate(selected._id, { name: name.trim() || selected.name, variables });
+    const trimmedName = name.trim() || "New environment";
+    const isDuplicateName = environments.some(
+      (env) => env._id !== selectedId && env.name.toLowerCase() === trimmedName.toLowerCase(),
+    );
+    if (isDuplicateName) {
+      setError(`An environment named "${trimmedName}" already exists.`);
+      return;
+    }
+
+    setError(null);
+    setSaving(true);
+    try {
+      const variables = toVariables(rows);
+      if (selectedId === "new") {
+        await onCreate(trimmedName, variables);
+        setName("");
+        setRows(toRows({}));
+      } else if (selected) {
+        await onUpdate(selected._id, { name: trimmedName, variables });
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -122,11 +147,13 @@ export function EnvironmentsModal({ environments, onCreate, onUpdate, onDelete, 
             </div>
           </div>
         </div>
+        {error && <div className="banner banner--error">{error}</div>}
         <div className="modal__actions">
           {selected && (
             <button
               type="button"
               className="button"
+              disabled={saving}
               onClick={() => {
                 onDelete(selected._id);
                 select("new");
@@ -135,11 +162,11 @@ export function EnvironmentsModal({ environments, onCreate, onUpdate, onDelete, 
               Delete
             </button>
           )}
-          <button type="button" className="button" onClick={onClose}>
+          <button type="button" className="button" onClick={onClose} disabled={saving}>
             Close
           </button>
-          <button type="button" className="button button--primary" onClick={save}>
-            Save
+          <button type="button" className="button button--primary" onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save"}
           </button>
         </div>
     </Modal>

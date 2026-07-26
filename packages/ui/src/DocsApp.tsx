@@ -107,12 +107,15 @@ export function DocsApp({
   const [me, setMe] = useState<CurrentMember | null>(null);
   const [doc, setDoc] = useState<OpenApiDoc | null>(null);
   const [folders, setFolders] = useState<FolderDoc[]>([]);
-  // True until the first spec/folders fetch resolves — an empty `folders`
-  // during that window means "haven't heard back yet," not "there's
-  // nothing here." A large real API can take several real seconds to
-  // answer, and without this the sidebar/main pane flash "No endpoints
-  // yet" the whole time, then swap to the real content once it arrives.
-  const [initialLoadPending, setInitialLoadPending] = useState(true);
+  // True while a spec/folders fetch is in flight — on first load AND on
+  // every version switch. An empty `folders` during that window means
+  // "haven't heard back yet," not "there's nothing here." A large real API
+  // can take several real seconds to answer, and without this the
+  // sidebar/main pane either flash "No endpoints yet" on first load, or
+  // (on a version switch) keep showing the PREVIOUS version's tree/content
+  // until the new version's slower response finally arrives — genuinely
+  // indistinguishable from the switch having silently failed.
+  const [specLoadPending, setSpecLoadPending] = useState(true);
   const [selectedVayoId, setSelectedVayoId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("details");
   // "endpoint" = today's one-at-a-time workspace (Details/Flowmap/History/
@@ -301,10 +304,18 @@ export function DocsApp({
 
   useEffect(() => {
     if (!token) return;
+    setSpecLoadPending(true);
+    // Cleared up front, not just left over from whichever version was
+    // active before — otherwise the OLD version's tree/content stays on
+    // screen for however long the new version's fetch takes (the loading
+    // state below only kicks in once `folders`/`doc` are actually empty),
+    // genuinely indistinguishable from the switch having silently failed.
+    setFolders([]);
+    setDoc(null);
     refetchSpecAndFolders()
       .then(() => setError(null))
       .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load spec"))
-      .finally(() => setInitialLoadPending(false));
+      .finally(() => setSpecLoadPending(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, token, activeVersion]);
 
@@ -612,6 +623,7 @@ export function DocsApp({
         <VersionSwitcher
           versions={apiVersions}
           activeVersion={activeVersion}
+          defaultVersion={version}
           onSelect={setActiveVersion}
           onManage={() => setVersionsModalOpen(true)}
           onCompare={() => setDiffModalOpen(true)}
@@ -709,7 +721,7 @@ export function DocsApp({
           onMoveToFolder={canEdit ? handleMoveToFolder : noop}
           onAutoOrganize={canEdit ? handleAutoOrganize : noop}
           onBlockedMove={setError}
-          isLoading={initialLoadPending}
+          isLoading={specLoadPending}
         />
         <main className="docs-app__main">
           {error && <div className="banner banner--error">{error}</div>}
@@ -737,12 +749,12 @@ export function DocsApp({
               onTryIt={tryItFromFullDoc}
               onSectionInView={setSelectedVayoId}
               settings={settings}
-              isLoading={initialLoadPending}
+              isLoading={specLoadPending}
             />
           )}
           {viewMode === "endpoint" && !selected && (
             <div className="empty-state">
-              {initialLoadPending
+              {specLoadPending
                 ? "Loading endpoints…"
                 : "No endpoints captured yet — hit some routes on your API, or create one manually, and they'll show up here."}
             </div>
