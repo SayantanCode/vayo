@@ -1,5 +1,7 @@
 # @vayo/types
 
+## 0.1.1-beta.3
+
 ## 0.1.1-beta.2
 
 ### Patch Changes
