@@ -19,9 +19,10 @@ and [`@vayo-hq/server`](https://www.npmjs.com/package/@vayo-hq/server) both
 consume. Every collection is prefixed `vayo_` to avoid colliding with your
 own collections in a shared database.
 
-Most people never call this directly — it's wired up automatically by
-`vayo init`/`vayo scan`/`vayo serve` in
-[`vayo`](https://www.npmjs.com/package/vayo).
+You'll typically call `createAdapter`/`runMigrations` directly in your own
+entry point — it's the exact snippet `vayo init` prints, and one of the
+packages installed alongside [`@vayo-hq/cli`](https://www.npmjs.com/package/@vayo-hq/cli)
+in the standard quickstart: `npm install @vayo-hq/db-mongo@beta`.
 
 ## License
 

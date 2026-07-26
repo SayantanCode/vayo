@@ -38,7 +38,8 @@ myExpressApp.use(vayoApp);
 ```
 
 Most people run this via `vayo serve` — see
-[`vayo`](https://www.npmjs.com/package/vayo).
+[`@vayo-hq/cli`](https://www.npmjs.com/package/@vayo-hq/cli). To mount it
+yourself instead: `npm install @vayo-hq/server@beta`.
 
 ## License
 

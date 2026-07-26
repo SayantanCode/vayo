@@ -19,12 +19,14 @@ latter a full Postman-parity request client), API versioning + spec
 diffing, an in-app notification center, and the `vayo` CLI
 (`init`/`scan`/`export`/`create-owner`/`serve`/`diff`).
 
-575 tests across all 9 packages (`pnpm test` from the repo root).
+649 tests across all 9 packages (`pnpm test` from the repo root).
 `docs/09-roadmap.md` tracks the full build sequence and each milestone's
-"done when" bar; M7 (this launch-readiness pass) is in progress — the
-packages stay `"private": true` in each `package.json` until npm publish is
-made as an explicit, separate decision. Everything below has been verified
-by installing packed tarballs into a real, separate project via plain
+"done when" bar; M7 (this launch-readiness pass) is in progress. All 9
+packages are published to npm under the `@vayo-hq` scope (the CLI is
+`@vayo-hq/cli`) — currently under the `beta` dist-tag while this launch
+pass is ongoing, so install with `@beta` explicitly rather than relying on
+`latest`. Everything below has been verified against the real, published
+packages installed into a separate throwaway project via plain
 `npm install` — not just run inside this workspace.
 
 ## Using Vayo in your own project
@@ -43,24 +45,9 @@ pulling in Express 5 anyway (`--force`/`--legacy-peer-deps`), `capture()`
 itself checks the actually-installed version at startup and logs a clear
 `console.warn` rather than failing silently with wrong route paths.
 
-Until these packages are published to npm, build the tarballs yourself from
-a checkout of this repo and install them into your own project by path:
-
 ```bash
-# inside this repo
-pnpm install && pnpm build
-for pkg in types ast schema-engine openapi-compiler db-mongo capture-express server ui cli; do
-  pnpm --filter @vayo-hq/$pkg pack --pack-destination /some/tarball/dir
-done
+npm install @vayo-hq/cli@beta @vayo-hq/capture-express@beta @vayo-hq/db-mongo@beta express@^4.19.0
 ```
-
-```bash
-# inside YOUR project
-npm install /some/tarball/dir/vayo-*.tgz express@^4.19.0
-```
-
-Once published, this collapses to `npm install @vayo-hq/capture-express
-@vayo-hq/db-mongo @vayo-hq/cli express@^4`.
 
 ### 1. Initialize
 

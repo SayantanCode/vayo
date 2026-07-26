@@ -53,9 +53,13 @@ router.get("/orders/:id", getOrder);
   from the one-line `summary` every route already gets for free.
 
 Most people never call this directly —
-[`vayo`](https://www.npmjs.com/package/vayo)'s `vayo scan` command
+[`@vayo-hq/cli`](https://www.npmjs.com/package/@vayo-hq/cli)'s `vayo scan` command
 is the intended entry point. This package exists standalone for anyone
-building custom tooling around the same static pass.
+building custom tooling around the same static pass:
+
+```bash
+npm install @vayo-hq/ast@beta
+```
 
 ## License
 
