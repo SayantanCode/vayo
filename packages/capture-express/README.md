@@ -29,7 +29,8 @@ The only Vayo package allowed to import Express types — everything
 downstream of it is framework-agnostic.
 
 Typically installed and wired via `vayo init`'s printed snippet — see
-[`vayo`](https://www.npmjs.com/package/vayo).
+[`@vayo-hq/cli`](https://www.npmjs.com/package/@vayo-hq/cli). Currently in
+beta: `npm install @vayo-hq/capture-express@beta`.
 
 ## License
 

@@ -37,9 +37,12 @@ Other exports:
   if the input looks like a Postman Collection export instead (a distinct,
   not-yet-built import path).
 
-Most people use this via
-[`vayo export`](https://www.npmjs.com/package/vayo) /
-`vayo import`, not directly.
+Most people use this via `vayo export`/`vayo import`, not directly — see
+[`@vayo-hq/cli`](https://www.npmjs.com/package/@vayo-hq/cli). To use it standalone:
+
+```bash
+npm install @vayo-hq/openapi-compiler@beta
+```
 
 ## License
 

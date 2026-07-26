@@ -11,8 +11,11 @@ dependency — v1 targets Express 4 only; a bare `npm install express` today
 resolves to Express 5, which this rejects — install `express@^4.19.0`
 explicitly).
 
+Currently in beta — install with the `@beta` tag explicitly, rather than
+relying on `latest`:
+
 ```bash
-npm install @vayo-hq/cli @vayo-hq/capture-express @vayo-hq/db-mongo express@^4.19.0
+npm install @vayo-hq/cli@beta @vayo-hq/capture-express@beta @vayo-hq/db-mongo@beta express@^4.19.0
 ```
 
 ## Quickstart

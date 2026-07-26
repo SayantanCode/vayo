@@ -1,7 +1,7 @@
 # @vayo-hq/schema-engine
 
 Framework-agnostic schema inference and merge logic for
-[Vayo](https://www.npmjs.com/package/vayo) — no Express import, no
+[Vayo](https://www.npmjs.com/package/@vayo-hq/cli) — no Express import, no
 MongoDB import, pure functions only.
 
 This is where a captured request/response sample and a static-scan result
@@ -20,7 +20,7 @@ re-scan or new traffic can never silently erase a manual edit. Key exports:
 Consumed internally by [`@vayo-hq/db-mongo`](https://www.npmjs.com/package/@vayo-hq/db-mongo)
 (which calls these merge functions on every capture/scan) — most people
 won't import this directly. Start with
-[`vayo`](https://www.npmjs.com/package/vayo).
+[`@vayo-hq/cli`](https://www.npmjs.com/package/@vayo-hq/cli).
 
 ## License
 
