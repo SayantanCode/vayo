@@ -1,5 +1,60 @@
 # @vayo/ui
 
+## 0.1.1-beta.3
+
+### Patch Changes
+
+- 54d83dd: Fixed two real issues found while running `vayo scan`/`vayo export`/the docs
+  UI against a real, large production API (600+ endpoints):
+
+  - `vayo scan`'s route-merge loop and `vayo export`/`vayo diff`'s per-endpoint
+    override/example/test-script lookups (and the identical logic in
+    `@vayo-hq/server`'s `GET /api/spec`/`GET /api/diff`) ran one DB round-trip
+    at a time in a sequential `for...of` loop — safe, but measured taking
+    minutes against a real remote MongoDB cluster at this scale, easily
+    mistaken for a hang. Added `mapWithConcurrency` to `@vayo-hq/schema-engine`
+    (bounded-concurrency `Promise.all`, 20 at a time — fast without firing
+    hundreds of simultaneous connections at the database) and switched every
+    one of these call sites to it.
+  - The docs UI's sidebar and main pane rendered "No endpoints yet"/"No
+    endpoints captured yet" immediately on load, before the first spec/folders
+    fetch had actually resolved — indistinguishable from a project with
+    nothing captured. A large real API can take several real seconds to
+    answer (see above), so this was a visible false-empty flash every time.
+    `DocsApp` now tracks whether the initial fetch is still pending and shows
+    "Loading endpoints…" instead, in the sidebar (`FolderTree`), the main pane,
+    and Full Docs mode (`FullDocView`).
+
+- 05b01a2: Fixed three more real issues found while using the docs UI against a real
+  production API:
+
+  - **The active version could get permanently stuck on "Unversioned."** The
+    very first endpoint ever captured resolves to a default version key
+    (schema-engine's `resolveVersion` fallback — usually "v1") before anyone
+    has explicitly created that version via "Manage versions…" — real data
+    exists under it, but no `ApiVersionDoc` does yet, so it never appeared as
+    a selectable option in the version switcher. Once a user switched to
+    "Unversioned" (always listed, unconditionally), there was no way back
+    short of manually creating a version with that exact name.
+    `VersionSwitcher` now always surfaces the app's default version key as a
+    selectable option when it isn't a real stored version yet.
+  - **Switching versions could leave the previous version's tree/content on
+    screen** for however long the new version's spec/folders fetch took —
+    genuinely indistinguishable from the switch having silently failed,
+    especially on a large real API where that fetch can take several real
+    seconds. The loading state added previously only covered the very first
+    load; it's now also cleared and re-armed on every version switch.
+  - **The Environments modal allowed duplicate names and double-submission.**
+    Nothing disabled the Save button while a create/update request was in
+    flight, so a double-click read the same identical form state twice and
+    created two duplicate environments; the form also never reset after a
+    successful creation. Added a `saving` state that disables Save/Delete/
+    Close and shows "Saving…" during the request, resets the form after a
+    successful creation, and added a duplicate-name check that surfaces a
+    clear inline error instead of silently allowing it.
+  - @vayo-hq/openapi-compiler@0.1.1-beta.3
+  - @vayo-hq/types@0.1.1-beta.3
+
 ## 0.1.1-beta.2
 
 ### Patch Changes
