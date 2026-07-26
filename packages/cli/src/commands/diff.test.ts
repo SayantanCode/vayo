@@ -11,7 +11,10 @@ const diffSpecs = vi.fn();
 vi.mock("@vayo-hq/db-mongo", () => ({
   createAdapter: () => ({ listApiVersions, listEndpoints, listOverrides }),
 }));
-vi.mock("@vayo-hq/schema-engine", () => ({ resolveEndpoint: (...args: unknown[]) => resolveEndpoint(...args) }));
+vi.mock("@vayo-hq/schema-engine", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@vayo-hq/schema-engine")>();
+  return { ...actual, resolveEndpoint: (...args: unknown[]) => resolveEndpoint(...args) };
+});
 vi.mock("@vayo-hq/openapi-compiler", () => ({
   compile: (...args: unknown[]) => compile(...args),
   diffSpecs: (...args: unknown[]) => diffSpecs(...args),

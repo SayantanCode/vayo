@@ -4,10 +4,15 @@
 // (docs/07-api-versioning.md).
 
 import type { ResolvedEndpoint } from "@vayo-hq/types";
-import { resolveEndpoint } from "@vayo-hq/schema-engine";
+import { resolveEndpoint, mapWithConcurrency } from "@vayo-hq/schema-engine";
 import { compile, diffSpecs } from "@vayo-hq/openapi-compiler";
 import { createAdapter } from "@vayo-hq/db-mongo";
 import { requireMongoUri } from "../config.js";
+
+/** See export.ts's identical constant — bounded concurrency instead of a
+ * plain `Promise.all` so a real, large API's override lookups don't
+ * overwhelm the database's own connection pool. */
+const FETCH_CONCURRENCY = 20;
 
 export interface DiffOptions {
   failOnBreaking?: boolean;
@@ -23,8 +28,8 @@ export async function diffCommand(from: string, to: string, options: DiffOptions
 
   async function compileVersion(version: string) {
     const endpoints = await db.listEndpoints(version);
-    const resolved: ResolvedEndpoint[] = await Promise.all(
-      endpoints.map(async (endpoint) => resolveEndpoint(endpoint, await db.listOverrides(endpoint.vayoId))),
+    const resolved: ResolvedEndpoint[] = await mapWithConcurrency(endpoints, FETCH_CONCURRENCY, async (endpoint) =>
+      resolveEndpoint(endpoint, await db.listOverrides(endpoint.vayoId)),
     );
     return compile(resolved, version);
   }

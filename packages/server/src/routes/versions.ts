@@ -3,12 +3,20 @@
 // versions.
 import { Router } from "express";
 import { z } from "zod";
-import { resolveEndpoint } from "@vayo-hq/schema-engine";
+import { resolveEndpoint, mapWithConcurrency } from "@vayo-hq/schema-engine";
 import { compile, diffSpecs, type CompileOptions } from "@vayo-hq/openapi-compiler";
 import type { ExampleDoc, ResolvedEndpoint, VayoDbAdapter } from "@vayo-hq/types";
 import { requireRole, type VayoAuthedRequest } from "../auth-middleware.js";
 import { autoCatchAsyncErrors } from "../error-handling.js";
 import type { RouteDeps } from "../server-deps.js";
+
+/** How many per-endpoint reads (overrides, examples) run at once. A real API
+ * can have hundreds of endpoints; a plain `Promise.all` firing that many
+ * simultaneous DB round-trips risks overwhelming the database's own
+ * connection pool — this is what the docs UI itself waits on every load, so
+ * a slow or stalled `/api/spec` response here is a real, visible loading
+ * delay, not just a CLI-only concern. */
+const FETCH_CONCURRENCY = 20;
 
 /** `compile()`'s `title`/`description`/`servers`/pinned examples, sourced
  * from `vayo_settings`/`vayo_environments`/`vayo_examples`
@@ -26,12 +34,10 @@ async function compileOptionsFromDb(db: VayoDbAdapter, resolved: ResolvedEndpoin
     .map((env) => ({ url: env.variables.baseUrl!, description: env.name }));
 
   const pinnedExamplesByVayoId = new Map<string, ExampleDoc[]>();
-  await Promise.all(
-    resolved.map(async (endpoint) => {
-      const pinned = (await db.listExamples(endpoint.vayoId)).filter((example) => example.pinned);
-      if (pinned.length > 0) pinnedExamplesByVayoId.set(endpoint.vayoId, pinned);
-    }),
-  );
+  await mapWithConcurrency(resolved, FETCH_CONCURRENCY, async (endpoint) => {
+    const pinned = (await db.listExamples(endpoint.vayoId)).filter((example) => example.pinned);
+    if (pinned.length > 0) pinnedExamplesByVayoId.set(endpoint.vayoId, pinned);
+  });
 
   const contact =
     settings.contactName || settings.contactEmail || settings.contactUrl
@@ -68,8 +74,8 @@ export function createVersionsRouter({ db, io }: RouteDeps): Router {
   router.get("/api/spec", requireRole("viewer"), async (req, res) => {
     const version = typeof req.query.version === "string" ? req.query.version : "v1";
     const endpoints = await db.listEndpoints(version);
-    const resolved = await Promise.all(
-      endpoints.map(async (endpoint) => resolveEndpoint(endpoint, await db.listOverrides(endpoint.vayoId))),
+    const resolved = await mapWithConcurrency(endpoints, FETCH_CONCURRENCY, async (endpoint) =>
+      resolveEndpoint(endpoint, await db.listOverrides(endpoint.vayoId)),
     );
     try {
       const doc = await compile(resolved, version, await compileOptionsFromDb(db, resolved));
@@ -144,8 +150,8 @@ export function createVersionsRouter({ db, io }: RouteDeps): Router {
 
     async function compileVersion(version: string) {
       const endpoints = await db.listEndpoints(version);
-      const resolved = await Promise.all(
-        endpoints.map(async (endpoint) => resolveEndpoint(endpoint, await db.listOverrides(endpoint.vayoId))),
+      const resolved = await mapWithConcurrency(endpoints, FETCH_CONCURRENCY, async (endpoint) =>
+        resolveEndpoint(endpoint, await db.listOverrides(endpoint.vayoId)),
       );
       return compile(resolved, version);
     }

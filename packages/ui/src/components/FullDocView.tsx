@@ -42,6 +42,10 @@ interface FullDocViewProps {
    * (driven by `selectedVayoId` in DocsApp.tsx) tracks free scrolling —
    * not just the clicks that jump here in the first place. */
   onSectionInView: (vayoId: string) => void;
+  /** True until the first spec/folders fetch resolves — see FolderTree's
+   * identical prop for why an empty `tree` needs to distinguish "still
+   * loading" from "genuinely nothing captured yet." */
+  isLoading?: boolean;
 }
 
 export function FullDocView({
@@ -57,6 +61,7 @@ export function FullDocView({
   onTryIt,
   onSectionInView,
   settings,
+  isLoading,
 }: FullDocViewProps): JSX.Element {
   // Every folder "expanded" — this view is a linear printout of the whole
   // tree, not a collapsible one; collapsing belongs to the sidebar's own
@@ -121,7 +126,9 @@ export function FullDocView({
   if (rows.length === 0) {
     return (
       <div className="empty-state">
-        No endpoints captured yet — hit some routes on your API, or create one manually, and they&apos;ll show up here.
+        {isLoading
+          ? "Loading endpoints…"
+          : "No endpoints captured yet — hit some routes on your API, or create one manually, and they'll show up here."}
       </div>
     );
   }
