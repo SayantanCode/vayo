@@ -51,8 +51,8 @@ jobs:
           # Newer than the rest of the repo's Node 20 baseline (packages'
           # own `engines.node: >=20` is a consumer-facing requirement, not a
           # constraint on what builds/publishes them) — found the hard way:
-          # `npm@latest` (12.x) itself now requires Node >=22.22.2, and 24 is
-          # the version actually confirmed to run OIDC trusted publishing
+          # npm 11/12 itself now requires Node >=22.22.2, and 24 is the
+          # version actually confirmed to run OIDC trusted publishing
           # reliably in practice, not just the minimum that satisfies npm's
           # own engine check.
           node-version: 24
@@ -66,10 +66,19 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Trusted Publishing's OIDC token exchange needs npm >= 11.5.1 — newer
-      # than what Node 20's bundled npm ships — forced explicitly rather
-      # than left to whatever version happens to come with the runner.
+      # than what Node 20's bundled npm ships. Pinned to a specific 11.x
+      # version rather than `npm@latest` deliberately: npm 12 (verified live,
+      # 2026-07-26) made an unknown CLI flag a hard EUNKNOWNCONFIG error
+      # instead of just a warning, and `changeset publish` always shells out
+      # to `pnpm publish --no-git-checks` — which has a real, open upstream
+      # bug (pnpm/pnpm#9646) that mangles `--no-git-checks` into a bare
+      # `--git-checks` before forwarding it to the underlying npm call. On
+      # npm <12 this was a harmless warning; on npm 12 it's fatal, and it
+      # killed every single package's publish the first time this pipeline
+      # actually ran for real. Bump this pin only after confirming a newer
+      # npm version doesn't reintroduce the same crash.
       - name: Ensure npm supports OIDC trusted publishing
-        run: npm install -g npm@latest
+        run: npm install -g npm@11.18.0
 
       # Publishing stale or missing dist/ output would be worse than not
       # publishing at all — dist/ is gitignored, so a fresh checkout has
@@ -95,9 +104,10 @@ jobs:
       # whatever's accumulated. Once that PR is merged, the push event this
       # workflow reacts to has zero pending changesets left, and
       # changesets/action runs `publish` instead: `pnpm release`
-      # (`changeset publish`) shells out to `npm publish` per package,
-      # authenticated entirely via the OIDC exchange above — an ordinary
-      # feature-PR merge (which normally adds a changeset) only ever
+      # (`changeset publish`) auto-detects this is a pnpm workspace and runs
+      # `pnpm publish` per package (correctly resolving `workspace:*` to real
+      # versions), authenticated entirely via the OIDC exchange above — an
+      # ordinary feature-PR merge (which normally adds a changeset) only ever
       # refreshes the Version PR, never triggers a real publish.
       - name: Create/update Version Packages PR, or publish once it's merged
         uses: changesets/action@v1
