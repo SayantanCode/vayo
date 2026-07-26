@@ -19,6 +19,7 @@
     "csp-connect-src-and-stale-error-banner",
     "deprecated-tag-and-server-side-lock",
     "exclude-test-helpers-from-server-package",
+    "fix-readme-stale-package-links",
     "flows-modal-viewer-controls",
     "header-toolbar-overflow",
     "import-missing-contact-license-tos",
